@@ -4,11 +4,14 @@ plugins {
 }
 
 android {
+    // Sync compileSdkVersion with targetSdkVersion for Android 16 (API 36)
+    compileSdkVersion 36
+    buildToolsVersion '34.0.0'
 
-    compileSdkVersion = 34
-    buildToolsVersion = '34'
-    aidlPackagedList "android/app/IServiceConnection.aidl"
-    aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
+    aidlPackagedList = [
+        "android/app/IServiceConnection.aidl",
+        "android/accounts/IAccountManagerResponse.aidl"
+    ]
 
     defaultConfig {
         minSdkVersion 21
@@ -16,8 +19,8 @@ android {
         versionCode 1
         versionName "1.0"
         consumerProguardFiles 'consumer-rules.pro'
+        
         ndk {
-         //   abiFilters "armeabi-v7a", "arm64-v8a"
             abiFilters "arm64-v8a"
         }
     }
@@ -73,15 +76,11 @@ tasks.withType(Javadoc) {
     options.addStringOption('charSet', 'UTF-8')
 }
 
-
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar", "*.aar"])
     implementation 'androidx.appcompat:appcompat:1.2.0'
-  //  implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-  //  implementation 'com.squareup.okio:okio:3.9.0'
     implementation 'com.github.tiann:FreeReflection:3.2.2'
     implementation 'com.github.CodingGay.BlackReflection:core:1.1.4'
     annotationProcessor 'com.github.CodingGay.BlackReflection:compiler:1.1.4'
     implementation 'net.lingala.zip4j:zip4j:2.11.5'
-
 }
