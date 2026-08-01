@@ -1,4 +1,3 @@
-// IBActivityManagerService.aidl
 package top.niunaijun.blackbox.core.system.am;
 
 import android.content.Intent;
@@ -15,8 +14,6 @@ import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.PendingResultData;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
 
-// Declare any non-default types here with import statements
-
 interface IBActivityManagerService {
     AppConfig initProcess(String packageName, String processName, int userId);
     void restartProcess(String packageName, String processName, int userId);
@@ -26,9 +23,14 @@ interface IBActivityManagerService {
     int startActivities(int userId, in Intent[] intent, in String[] resolvedType, IBinder resultTo, in Bundle options);
 
     ComponentName startService(in Intent intent, String resolvedType, boolean requireForeground, int userId);
-    int stopService(in Intent intent,in String resolvedType, int userId);
+    int stopService(in Intent intent, in String resolvedType, int userId);
 
+    // Android 8-15
     Intent bindService(in Intent service, in IBinder binder, String resolvedType, int userId);
+    
+    // Android 16+ with session
+    Intent bindServiceV2(in Intent service, in IBinder binder, String resolvedType, int userId, in Object session);
+    
     void unbindService(in IBinder binder, int userId);
 
     void stopServiceToken(in ComponentName className, in IBinder token, int userId);
