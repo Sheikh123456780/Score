@@ -9,7 +9,7 @@ import android.os.RemoteException;
 import java.util.HashMap;
 import java.util.Map;
 
-import black.android.app.BRIServiceConnectionO;
+import black.android.app.IServiceConnectionO;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
@@ -55,16 +55,64 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
         return delegate;
     }
 
-    @Override
-    public void connected(ComponentName name, IBinder service) throws RemoteException {
-        connected(name, service, false);
-    }
+@Override
+public void connected(ComponentName name,
+                      IBinder service) throws RemoteException {
+    dispatchConnected(name, service, null, false);
+}
 
-    public void connected(ComponentName name, IBinder service, boolean dead) throws RemoteException {
+public void connected(ComponentName name,
+                      IBinder service,
+                      boolean dead) throws RemoteException {
+    dispatchConnected(name, service, null, dead);
+}
+
+/*
+ * Android 15 / Android 16
+ * New IServiceConnection callback.
+ *
+ * The third argument type changed between Android releases,
+ * so use Object to remain compatible with all API levels.
+ */
+public void connected(ComponentName name,
+                      IBinder service,
+                      Object session,
+                      boolean dead) throws RemoteException {
+    dispatchConnected(name, service, session, dead);
+}
+
+private void dispatchConnected(ComponentName name,
+                               IBinder service,
+                               Object session,
+                               boolean dead) throws RemoteException {
+
+    try {
+
         if (BuildCompat.isOreo()) {
-            BRIServiceConnectionO.get(mConn).connected(mComponentName, service, dead);
+
+            IServiceConnectionO.Compat.connected(
+                    mConn,
+                    mComponentName,
+                    service,
+                    session,
+                    dead
+            );
+
         } else {
-            mConn.connected(name, service);
+
+            try {
+                mConn.connected(name, service);
+            } catch (Throwable ignored) {
+            }
+
         }
+
+    } catch (Throwable e) {
+
+        try {
+            mConn.connected(name, service);
+        } catch (Throwable ignored) {
+        }
+
     }
 }
