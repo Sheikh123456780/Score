@@ -1,3 +1,4 @@
+
 package top.niunaijun.blackbox.core.system.am;
 
 import android.content.Intent;
@@ -28,8 +29,9 @@ interface IBActivityManagerService {
     // Android 8-15
     Intent bindService(in Intent service, in IBinder binder, String resolvedType, int userId);
     
-    // Android 16+ with session
-    Intent bindServiceV2(in Intent service, in IBinder binder, String resolvedType, int userId, in Object session);
+    // Android 16+ with session - use IBinder instead of Object
+    // Session is passed as IBinder to be AIDL compatible
+    Intent bindServiceV2(in Intent service, in IBinder binder, String resolvedType, int userId, in IBinder session);
     
     void unbindService(in IBinder binder, int userId);
 
