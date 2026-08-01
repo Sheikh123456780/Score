@@ -4,18 +4,12 @@ import android.content.ComponentName;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-/**
- * Created by Milk on 4/7/21.
- * Updated for Android 16 compatibility
- * Added session field for new ServiceConnection API
- */
 public class UnbindRecord implements Parcelable {
     private int mBindCount;
     private int mStartId;
     private ComponentName mComponentName;
     
-    // Android 16+ session parameter
-    // Not parcelled because session is not Parcelable in all cases
+    // Android 16+ session - transient so not parcelled
     private transient Object mSession;
 
     public int getStartId() {
@@ -42,16 +36,10 @@ public class UnbindRecord implements Parcelable {
         mComponentName = componentName;
     }
 
-    /**
-     * Get session for Android 16+
-     */
     public Object getSession() {
         return mSession;
     }
 
-    /**
-     * Set session for Android 16+
-     */
     public void setSession(Object session) {
         this.mSession = session;
     }
@@ -69,14 +57,12 @@ public class UnbindRecord implements Parcelable {
         dest.writeInt(this.mBindCount);
         dest.writeInt(this.mStartId);
         dest.writeParcelable(this.mComponentName, flags);
-        // Session is transient, not written to parcel
     }
 
     protected UnbindRecord(Parcel in) {
         this.mBindCount = in.readInt();
         this.mStartId = in.readInt();
         this.mComponentName = in.readParcelable(ComponentName.class.getClassLoader());
-        // Session is transient, not read from parcel
     }
 
     public static final Creator<UnbindRecord> CREATOR = new Creator<UnbindRecord>() {
