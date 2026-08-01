@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -27,14 +28,12 @@ import top.niunaijun.blackbox.entity.UnbindRecord;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
 import top.niunaijun.blackbox.proxy.record.ProxyServiceRecord;
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
  * Created by Milk on 4/7/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Android 16 compatible ActiveServices
+ * Updated for new ServiceConnection API
  */
 @SuppressLint("NewApi")
 public class ActiveServices {
@@ -43,12 +42,14 @@ public class ActiveServices {
     private final Map<Intent.FilterComparison, RunningServiceRecord> mRunningServiceRecords = new HashMap<>();
     private final Map<IBinder, RunningServiceRecord> mRunningTokens = new HashMap<>();
     private final Map<IBinder, ConnectedServiceRecord> mConnectedServices = new HashMap<>();
+    
+    // Android 16+ session tracking
+    private final Map<IBinder, Object> mServiceSessions = new HashMap<>();
 
     public void startService(Intent intent, String resolvedType, boolean requireForeground, int userId) {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return;
-//            throw new RuntimeException("resolveService service exception");
         ServiceInfo serviceInfo = resolveInfo.serviceInfo;
         ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(serviceInfo.packageName, serviceInfo.processName, userId, -1, Binder.getCallingPid());
         if (processRecord == null) {
@@ -72,7 +73,6 @@ public class ActiveServices {
     }
 
     public int stopService(Intent intent, String resolvedType, int userId) {
-//        ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         synchronized (mRunningServiceRecords) {
             RunningServiceRecord runningServiceRecord = findRunningServiceRecord(intent);
             if (runningServiceRecord == null) {
@@ -99,7 +99,21 @@ public class ActiveServices {
         return 0;
     }
 
+    /**
+     * Android 8-15 bindService
+     */
     public Intent bindService(Intent intent, final IBinder binder, String resolvedType, int userId) {
+        return bindServiceInternal(intent, binder, resolvedType, userId, null);
+    }
+
+    /**
+     * Android 16+ bindService with session
+     */
+    public Intent bindServiceV2(Intent intent, final IBinder binder, String resolvedType, int userId, Object session) {
+        return bindServiceInternal(intent, binder, resolvedType, userId, session);
+    }
+
+    private Intent bindServiceInternal(Intent intent, final IBinder binder, String resolvedType, int userId, Object session) {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return intent;
@@ -132,6 +146,7 @@ public class ActiveServices {
                             public void binderDied() {
                                 binder.unlinkToDeath(this, 0);
                                 mConnectedServices.remove(binder);
+                                mServiceSessions.remove(binder);
                             }
                         }, 0);
                     } catch (RemoteException e) {
@@ -140,12 +155,18 @@ public class ActiveServices {
                     connectedService.mIBinder = binder;
                     connectedService.mIntent = intent;
                     mConnectedServices.put(binder, connectedService);
+                    
+                    // Store session for Android 16+
+                    if (session != null) {
+                        mServiceSessions.put(binder, session);
+                    }
                 }
 
                 if (!isBound) {
                     runningServiceRecord.incrementBindCountAndGet();
                 }
                 runningServiceRecord.mConnectedServiceRecord = connectedService;
+                runningServiceRecord.mSession = session;
             }
         }
         return createStubServiceIntent(intent, serviceInfo, processRecord, runningServiceRecord);
@@ -160,6 +181,7 @@ public class ActiveServices {
         runningServiceRecord.mConnectedServiceRecord = null;
         runningServiceRecord.mBindCount.decrementAndGet();
         mConnectedServices.remove(binder);
+        mServiceSessions.remove(binder);
     }
 
     public void stopServiceToken(ComponentName className, IBinder token, int userId) {
@@ -182,6 +204,15 @@ public class ActiveServices {
         RunningServiceRecord remove = mRunningServiceRecords.remove(new Intent.FilterComparison(proxyIntent));
         if (remove != null) {
             mRunningTokens.remove(remove);
+            if (remove.mSession != null) {
+                // Clean up session for Android 16+
+                for (Map.Entry<IBinder, Object> entry : mServiceSessions.entrySet()) {
+                    if (entry.getValue() == remove.mSession) {
+                        mServiceSessions.remove(entry.getKey());
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -198,6 +229,7 @@ public class ActiveServices {
         record.setComponentName(component);
         record.setBindCount(runningServiceRecord.mBindCount.get());
         record.setStartId(runningServiceRecord.mStartId.get());
+        record.setSession(runningServiceRecord.mSession);
         return record;
     }
 
@@ -275,14 +307,12 @@ public class ActiveServices {
     }
 
     public static class RunningServiceRecord extends IEmpty.Stub {
-        // onStartCommand startId
         private final AtomicInteger mStartId = new AtomicInteger(1);
         private final AtomicInteger mBindCount = new AtomicInteger(0);
-        // 正在连接的服务
         private ConnectedServiceRecord mConnectedServiceRecord;
-
         private ServiceInfo mServiceInfo;
         private Intent mIntent;
+        private Object mSession; // Android 16+ session
 
         public int getAndIncrementStartId() {
             return mStartId.getAndIncrement();
