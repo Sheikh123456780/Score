@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
-import android.os.Build;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -51,7 +50,12 @@ public class ActiveServices {
         if (resolveInfo == null)
             return;
         ServiceInfo serviceInfo = resolveInfo.serviceInfo;
-        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(serviceInfo.packageName, serviceInfo.processName, userId, -1, Binder.getCallingPid());
+        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(
+                serviceInfo.packageName, 
+                serviceInfo.processName, 
+                userId, 
+                -1, 
+                Binder.getCallingPid());
         if (processRecord == null) {
             throw new RuntimeException("Unable to create " + serviceInfo.name);
         }
@@ -87,7 +91,12 @@ public class ActiveServices {
             if (resolveInfo == null)
                 return 0;
             ServiceInfo serviceInfo = resolveInfo.serviceInfo;
-            ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(serviceInfo.packageName, serviceInfo.processName, userId, -1, Binder.getCallingPid());
+            ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(
+                    serviceInfo.packageName, 
+                    serviceInfo.processName, 
+                    userId, 
+                    -1, 
+                    Binder.getCallingPid());
             if (processRecord == null) {
                 return 0;
             }
@@ -122,7 +131,8 @@ public class ActiveServices {
                 serviceInfo.packageName,
                 serviceInfo.processName,
                 userId,
-                -1, Binder.getCallingPid());
+                -1, 
+                Binder.getCallingPid());
 
         if (processRecord == null) {
             throw new RuntimeException("Unable to create " + serviceInfo.name);
@@ -217,29 +227,36 @@ public class ActiveServices {
     }
 
     public UnbindRecord onServiceUnbind(Intent proxyIntent, int userId) throws RemoteException {
-    if (proxyIntent == null)
-        return null;
-    ProxyServiceRecord proxyServiceRecord = ProxyServiceRecord.create(proxyIntent);
-    ComponentName component = proxyServiceRecord.mServiceIntent.getComponent();
+        if (proxyIntent == null)
+            return null;
+        ProxyServiceRecord proxyServiceRecord = ProxyServiceRecord.create(proxyIntent);
+        if (proxyServiceRecord.mServiceIntent == null)
+            return null;
+        
+        ComponentName component = proxyServiceRecord.mServiceIntent.getComponent();
+        RunningServiceRecord runningServiceRecord = findRunningServiceRecord(proxyServiceRecord.mServiceIntent);
+        if (runningServiceRecord == null)
+            return null;
+            
+        UnbindRecord record = new UnbindRecord();
+        record.setComponentName(component);
+        record.setBindCount(runningServiceRecord.mBindCount.get());
+        record.setStartId(runningServiceRecord.mStartId.get());
+        // Android 16+ session
+        record.setSession(runningServiceRecord.mSession);
+        return record;
+    }
 
-    RunningServiceRecord runningServiceRecord = findRunningServiceRecord(proxyServiceRecord.mServiceIntent);
-    if (runningServiceRecord == null)
-        return null;
-    UnbindRecord record = new UnbindRecord();
-    record.setComponentName(component);
-    record.setBindCount(runningServiceRecord.mBindCount.get());
-    record.setStartId(runningServiceRecord.mStartId.get());
-    // Android 16+ session
-    record.setSession(runningServiceRecord.mSession);
-    return record;
-}
-
-    private Intent createStubServiceIntent(Intent targetIntent, ServiceInfo serviceInfo, ProcessRecord processRecord, RunningServiceRecord runningServiceRecord) {
+    private Intent createStubServiceIntent(Intent targetIntent, ServiceInfo serviceInfo, 
+                                           ProcessRecord processRecord, RunningServiceRecord runningServiceRecord) {
         Intent stub = new Intent();
-        ComponentName stubComp = new ComponentName(BlackBoxCore.getHostPkg(), ProxyManifest.getProxyService(processRecord.bpid));
+        ComponentName stubComp = new ComponentName(
+                BlackBoxCore.getHostPkg(), 
+                ProxyManifest.getProxyService(processRecord.bpid));
         stub.setComponent(stubComp);
         stub.setAction(UUID.randomUUID().toString());
-        ProxyServiceRecord.saveStub(stub, targetIntent, serviceInfo, runningServiceRecord, processRecord.userId, runningServiceRecord.mStartId.get());
+        ProxyServiceRecord.saveStub(stub, targetIntent, serviceInfo, runningServiceRecord, 
+                processRecord.userId, runningServiceRecord.mStartId.get());
         return stub;
     }
 
@@ -274,7 +291,10 @@ public class ActiveServices {
         RunningServiceInfo info = new RunningServiceInfo();
         for (RunningServiceRecord value : mRunningServiceRecords.values()) {
             ServiceInfo serviceInfo = value.mServiceInfo;
-            ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(callerPackage, serviceInfo.processName, userId);
+            if (serviceInfo == null) continue;
+            
+            ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(
+                    callerPackage, serviceInfo.processName, userId);
             if (processRecord == null)
                 continue;
             ActivityManager.RunningServiceInfo runningServiceInfo = serviceInfoMap.get(processRecord.pid);
@@ -291,8 +311,10 @@ public class ActiveServices {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return null;
-        ProcessRecord processRecord =
-                BProcessManagerService.get().findProcessRecord(resolveInfo.serviceInfo.packageName, resolveInfo.serviceInfo.processName, userId);
+        ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(
+                resolveInfo.serviceInfo.packageName, 
+                resolveInfo.serviceInfo.processName, 
+                userId);
         if (processRecord == null)
             return null;
         try {
