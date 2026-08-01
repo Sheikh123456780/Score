@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ProviderInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -16,14 +17,12 @@ import top.niunaijun.blackbox.entity.UnbindRecord;
 import top.niunaijun.blackbox.entity.am.PendingResultData;
 import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
  * Created by Milk on 4/14/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Android 16 compatible version
+ * Updated for new IServiceConnection API
  */
 public class BActivityManager extends BlackManager<IBActivityManagerService> {
     private static final BActivityManager sActivityManager = new BActivityManager();
@@ -98,8 +97,31 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
         return -1;
     }
 
+    /**
+     * Android 16 compatible bindService
+     * Handles new session parameter internally
+     */
     public Intent bindService(Intent service, IBinder binder, String resolvedType, int userId) {
         try {
+            // Android 16+ uses new bindService signature
+            if (BuildCompat.isAndroid16()) {
+                return getService().bindServiceV2(service, binder, resolvedType, userId, null);
+            }
+            return getService().bindService(service, binder, resolvedType, userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Android 16+ bindService with session
+     */
+    public Intent bindService(Intent service, IBinder binder, String resolvedType, int userId, Object session) {
+        try {
+            if (BuildCompat.isAndroid16()) {
+                return getService().bindServiceV2(service, binder, resolvedType, userId, session);
+            }
             return getService().bindService(service, binder, resolvedType, userId);
         } catch (RemoteException e) {
             e.printStackTrace();
