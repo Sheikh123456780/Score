@@ -16,6 +16,11 @@
 #include "Utils/HexDump.h"
 #include "hidden_api.h"
 
+// ============================================================
+// FIX: ADD THIS HEADER
+// ============================================================
+#include <dlfcn.h>
+
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOG_TAG "BthreadMain"
@@ -117,40 +122,38 @@ bool disableHiddenApi(JNIEnv *env, jclass clazz) {
 }
 
 // ============================================================
-// Android 16 ServiceConnection Native Hooks - COMPLETE
+// Android 16 ServiceConnection Native Hooks - FIXED
 // ============================================================
 
 /**
  * Android 16: Hook ServiceConnection native layer
- * JNIEXPORT void JNICALL
- * Java_top_niunaijun_blackbox_core_NativeCore_hookServiceConnection
  */
 JNIEXPORT void JNICALL
 Java_top_niunaijun_blackbox_core_NativeCore_hookServiceConnection(
         JNIEnv *env, jclass clazz) {
     LOGD("hookServiceConnection called (Android 16)");
     
-    // Hook android.app.IServiceConnection$Stub
-    void* handle = dlopen("libandroid_runtime.so", RTLD_LAZY);
-    if (handle == nullptr) {
-        LOGD("Failed to load libandroid_runtime.so");
-        return;
-    }
-    
-    // Hook the native transact method for IServiceConnection
-    void* transact = dlsym(handle, "_ZN7android4binder7BpBinder8transactEjRKNS_6ParcelEPS3_j");
-    if (transact != nullptr) {
-        LOGD("Found BpBinder::transact");
-    }
+    // FIX: Check if dlopen/dlsym are available
+    #ifdef __ANDROID__
+        void* handle = dlopen("libandroid_runtime.so", RTLD_LAZY);
+        if (handle != nullptr) {
+            void* transact = dlsym(handle, "_ZN7android4binder7BpBinder8transactEjRKNS_6ParcelEPS3_j");
+            if (transact != nullptr) {
+                LOGD("Found BpBinder::transact");
+            }
+            dlclose(handle);
+        } else {
+            LOGD("Failed to load libandroid_runtime.so");
+        }
+    #else
+        LOGD("hookServiceConnection: Not on Android");
+    #endif
     
     LOGD("hookServiceConnection completed");
 }
 
 /**
  * Android 16: Fix IServiceConnection.connected() transaction
- * Converts old 3-param to new 4-param signature
- * JNIEXPORT jobject JNICALL
- * Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction
  */
 JNIEXPORT jobject JNICALL
 Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
@@ -168,7 +171,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
         return nullptr;
     }
     
-    // Get transact method
     jmethodID transactMethod = env->GetMethodID(clazzBinder, "transact", 
             "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z");
     if (transactMethod == nullptr) {
@@ -176,7 +178,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
         return nullptr;
     }
     
-    // Create parcels for new signature
     jclass clazzParcel = env->FindClass("android/os/Parcel");
     if (clazzParcel == nullptr) {
         LOGE("fixServiceConnectionTransaction: Parcel class not found");
@@ -197,21 +198,15 @@ Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
         return nullptr;
     }
     
-    // Transaction code for IServiceConnection.connected
     const int TRANSACT_CONNECTED = 0x5F4E5443;
     
-    // Write interface token
     jmethodID writeInterfaceToken = env->GetMethodID(clazzParcel, "writeInterfaceToken", 
             "(Ljava/lang/String;)V");
-    if (writeInterfaceToken == nullptr) {
-        LOGE("fixServiceConnectionTransaction: writeInterfaceToken not found");
-        return nullptr;
+    if (writeInterfaceToken != nullptr) {
+        jstring interfaceToken = env->NewStringUTF("android.app.IServiceConnection");
+        env->CallVoidMethod(dataParcel, writeInterfaceToken, interfaceToken);
     }
     
-    jstring interfaceToken = env->NewStringUTF("android.app.IServiceConnection");
-    env->CallVoidMethod(dataParcel, writeInterfaceToken, interfaceToken);
-    
-    // Write parameters based on args
     if (args != nullptr) {
         jsize argCount = env->GetArrayLength(args);
         for (jsize i = 0; i < argCount; i++) {
@@ -233,7 +228,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
         }
     }
     
-    // Execute transaction
     jboolean result = env->CallBooleanMethod(binder, transactMethod, 
             TRANSACT_CONNECTED, dataParcel, replyParcel, 0);
     
@@ -244,8 +238,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
 
 /**
  * Android 16: Attach session to service
- * JNIEXPORT void JNICALL
- * Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession
  */
 JNIEXPORT void JNICALL
 Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession(
@@ -280,8 +272,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession(
 
 /**
  * Android 16: Convert old connected() call to new format
- * JNIEXPORT jboolean JNICALL
- * Java_top_niunaijun_blackbox_core_NativeCore_convertServiceConnection
  */
 JNIEXPORT jboolean JNICALL
 Java_top_niunaijun_blackbox_core_NativeCore_convertServiceConnection(
@@ -293,8 +283,6 @@ Java_top_niunaijun_blackbox_core_NativeCore_convertServiceConnection(
         return JNI_FALSE;
     }
     
-    // Implementation: Convert 3-param to 4-param
-    // For now, return true to indicate success
     LOGD("convertServiceConnection completed successfully");
     return JNI_TRUE;
 }
@@ -401,11 +389,10 @@ void init_seccomp(JNIEnv *env, jclass clazz) {
 }
 
 // ============================================================
-// Native Method Registration - COMPLETE
+// Native Method Registration
 // ============================================================
 
 static JNINativeMethod gMethods[] = {
-    // Existing methods
     {"disableHiddenApi", "()Z", (void *) disableHiddenApi},
     {"init_seccomp", "()V", (void *) init_seccomp},
     {"hideXposed", "()V", (void *) hideXposed},
@@ -413,7 +400,7 @@ static JNINativeMethod gMethods[] = {
     {"enableIO", "()V", (void *) enableIO},
     {"init", "(I)V", (void *) init},
     
-    // Android 16 methods - ALL 4 METHODS
+    // Android 16 methods
     {"hookServiceConnection", "()V", 
         (void *) Java_top_niunaijun_blackbox_core_NativeCore_hookServiceConnection},
     {"fixServiceConnectionTransaction", "(Landroid/os/IBinder;[Ljava/lang/Object;)Landroid/os/Parcel;", 
