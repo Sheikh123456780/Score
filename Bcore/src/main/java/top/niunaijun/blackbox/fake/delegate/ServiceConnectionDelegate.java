@@ -9,10 +9,9 @@ import android.os.RemoteException;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Android 16+ compatible ServiceConnectionDelegate
- */
-public class ServiceConnectionDelegate extends IServiceConnection.Stub {
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
+
+public class ServiceConnectionDelegate extends IServiceConnection.Stub implements IBinder.DeathRecipient {
     private static final Map<IBinder, ServiceConnectionDelegate> sServiceConnectDelegate = new HashMap<>();
     private final IServiceConnection mConn;
     private final ComponentName mComponentName;
@@ -20,24 +19,45 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
     private ServiceConnectionDelegate(IServiceConnection conn, ComponentName targetComponent) {
         this.mConn = conn;
         this.mComponentName = targetComponent;
-        // DeathRecipient to clean up when connection dies
-        try {
-            conn.asBinder().linkToDeath(() -> {
-                sServiceConnectDelegate.remove(conn.asBinder());
-                conn.asBinder().unlinkToDeath(this, 0);
-            }, 0);
-        } catch (RemoteException ignored) {}
+    }
+
+    // 🔥 FIX 1: Add this method back for compatibility with other BlackBox classes
+    public static ServiceConnectionDelegate getDelegate(IBinder iBinder) {
+        return sServiceConnectDelegate.get(iBinder);
     }
 
     public static IServiceConnection createProxy(IServiceConnection base, Intent intent) {
         if (base == null) return null;
-        IBinder binder = base.asBinder();
-        ServiceConnectionDelegate delegate = sServiceConnectDelegate.get(binder);
+        
+        final IBinder iBinder = base.asBinder();
+        ServiceConnectionDelegate delegate = sServiceConnectDelegate.get(iBinder);
+        
         if (delegate == null) {
+            try {
+                iBinder.linkToDeath(new IBinder.DeathRecipient() {
+                    @Override
+                    public void binderDied() {
+                        sServiceConnectDelegate.remove(iBinder);
+                        iBinder.unlinkToDeath(this, 0);
+                    }
+                }, 0);
+            } catch (RemoteException e) {
+                e.printStackTrace();
+            }
             delegate = new ServiceConnectionDelegate(base, intent.getComponent());
-            sServiceConnectDelegate.put(binder, delegate);
+            sServiceConnectDelegate.put(iBinder, delegate);
         }
         return delegate;
+    }
+
+    // 🔥 FIX 2: Implement DeathRecipient interface
+    @Override
+    public void binderDied() {
+        IBinder binder = mConn != null ? mConn.asBinder() : null;
+        if (binder != null) {
+            sServiceConnectDelegate.remove(binder);
+            binder.unlinkToDeath(this, 0);
+        }
     }
 
     // ============================================================
@@ -56,15 +76,15 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
     }
 
     // ============================================================
-    // Android 16+: 4-param connected() with session
-    // CRITICAL FIX: This resolves the AbstractMethodError on Android 16
+    // 🔥 Android 16+: 4-param connected() with session
+    // This resolves the AbstractMethodError
     // ============================================================
     public void connected(ComponentName name, IBinder service, Object session, boolean dead) throws RemoteException {
         dispatchConnected(name, service, session, dead);
     }
 
     // ============================================================
-    // Core dispatch - tries all signatures from 2 to 4 params
+    // Core dispatch - tries all signatures
     // ============================================================
     private void dispatchConnected(ComponentName name, IBinder service, Object session, boolean dead) throws RemoteException {
         if (mConn == null) return;
@@ -72,10 +92,10 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
         // Try 4-param (Android 16+)
         try {
             java.lang.reflect.Method m = mConn.getClass().getMethod(
-                "connected", 
-                ComponentName.class, 
-                IBinder.class, 
-                Object.class, 
+                "connected",
+                ComponentName.class,
+                IBinder.class,
+                Object.class,
                 boolean.class
             );
             m.invoke(mConn, name, service, session, dead);
@@ -94,7 +114,18 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
             return;
         } catch (NoSuchMethodException ignored) {}
 
-        // Fallback to 2-param (Android 8-14)
+        // Try 2-param (Android 8-14)
+        try {
+            java.lang.reflect.Method m = mConn.getClass().getMethod(
+                "connected",
+                ComponentName.class,
+                IBinder.class
+            );
+            m.invoke(mConn, name, service);
+            return;
+        } catch (NoSuchMethodException ignored) {}
+
+        // Absolute fallback
         mConn.connected(name, service);
     }
 }
