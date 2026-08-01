@@ -6,10 +6,6 @@ import android.os.IBinder;
 
 import top.niunaijun.blackbox.utils.compat.BundleCompat;
 
-/**
- * Created by Milk on 4/1/21.
- * Android 16 compatible ProxyServiceRecord
- */
 public class ProxyServiceRecord {
     public Intent mServiceIntent;
     public ServiceInfo mServiceInfo;
