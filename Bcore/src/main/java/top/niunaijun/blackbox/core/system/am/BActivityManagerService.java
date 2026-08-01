@@ -308,12 +308,13 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
     }
 
     /**
-     * Android 16+ bindService with session
+     * Android 16+ bindService with session (as IBinder for AIDL compatibility)
      */
     @Override
-    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, Object session) throws RemoteException {
+    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, IBinder session) throws RemoteException {
         UserSpace userSpace = getOrCreateSpaceLocked(userId);
         synchronized (userSpace.mActiveServices) {
+            // Convert IBinder session to Object if needed
             return userSpace.mActiveServices.bindServiceV2(service, binder, resolvedType, userId, session);
         }
     }
