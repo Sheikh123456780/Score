@@ -19,23 +19,11 @@ import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
-/**
- * Extended patched NativeCore with more anti-detection shims to cover
- * additional probes observed in the logs (proc/self/root, profile files, dev/urandom, etc.).
- *
- * Notes:
- *  - This uses simple path-to-path redirections via addIORule() implemented in native layer.
- *  - For profile files that are system-owned (permission denied), we create a benign copy
- *    under the BlackBox app's private storage and redirect the game's access to it.
- *
- * Keep expanding addIORule() targets when you find new probe paths in logs.
- */
 public class NativeCore {
     public static final String TAG = "NativeCore";
     private static boolean sInitialized = false;
 
     static {
-        // Load HASAD library (your main native library)
         try {
             System.loadLibrary("HASAD");
             Log.d(TAG, "Loaded HASAD library successfully");
@@ -43,7 +31,6 @@ public class NativeCore {
             Log.e(TAG, "Failed to load HASAD library", e);
         }
 
-        // Load additional bgmi library if exists
         try {
             File libFile = new File(
                     BlackBoxCore.getContext().getFilesDir(),
@@ -59,7 +46,7 @@ public class NativeCore {
     }
 
     // ============================================================
-    // Existing Native Methods (from HASAD)
+    // Existing Native Methods
     // ============================================================
 
     public static native void init(int apiLevel);
@@ -70,41 +57,16 @@ public class NativeCore {
     public static native void init_seccomp();
 
     // ============================================================
-    // Android 16 Native Methods - ADD THESE
-    // These must be implemented in HASAD library or added
+    // Android 16 Native Methods - MUST MATCH C++ IMPLEMENTATIONS
     // ============================================================
 
-    /**
-     * Android 16: Hook ServiceConnection native layer
-     * Called during initialization on Android 16+
-     */
     public static native void hookServiceConnection();
-
-    /**
-     * Android 16: Fix ServiceConnection transaction
-     * Converts old 3-param connected() to new 4-param signature
-     * 
-     * @param binder The IServiceConnection binder
-     * @param args The arguments passed to connected()
-     * @return Parcel with fixed transaction data
-     */
     public static native Parcel fixServiceConnectionTransaction(IBinder binder, Object[] args);
-
-    /**
-     * Android 16: Attach session to service
-     * 
-     * @param service The service binder
-     * @param session The session object to attach
-     */
     public static native void attachServiceSession(IBinder service, Object session);
-
-    /**
-     * Android 16: Convert old connected() call to new format
-     */
     public static native boolean convertServiceConnection(IBinder binder, Object[] oldArgs, Object[] newArgs);
 
     // ============================================================
-    // Init Method - Updated
+    // Init Method
     // ============================================================
 
     public static void initCore(int apiLevel) {
@@ -112,11 +74,9 @@ public class NativeCore {
         sInitialized = true;
 
         try {
-            // Init native
             init(apiLevel);
             Log.d(TAG, "HASAD init completed");
             
-            // Android 16 specific hooks
             if (BuildCompat.isAndroid16()) {
                 Log.d(TAG, "Android 16 detected, applying ServiceConnection hooks");
                 try {
@@ -124,11 +84,9 @@ public class NativeCore {
                     Log.d(TAG, "hookServiceConnection called successfully");
                 } catch (Throwable e) {
                     Log.e(TAG, "hookServiceConnection failed: " + e.getMessage());
-                    // Continue anyway - may be implemented in HASAD
                 }
             }
 
-            // Initialize seccomp
             init_seccomp();
             Log.d(TAG, "NativeCore initialized successfully");
         } catch (Throwable e) {
