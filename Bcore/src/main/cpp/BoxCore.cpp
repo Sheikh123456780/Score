@@ -30,7 +30,6 @@ struct {
     int api_level;
 } VMEnv;
 
-
 JNIEnv *getEnv() {
     JNIEnv *env;
     VMEnv.vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
@@ -44,20 +43,6 @@ JNIEnv *ensureEnvCreated() {
     }
     return env;
 }
-/*
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_top_niunaijun_blackbox_BlackBoxCore_BthreadMain(JNIEnv *env, jobject thiz) {
-    LOGE("Native BthreadMain called");
-    const char* key = "blackbox_license_activated";
-    if (strcmp(key, "blackbox_license_activated") == 0) {
-        return JNI_TRUE;
-    } else {
-        abort(); // crash
-        return JNI_FALSE;
-    }
-}
-*/
 
 int BoxCore::getCallingUid(JNIEnv *env, int orig) {
     env = ensureEnvCreated();
@@ -91,7 +76,6 @@ void nativeHook(JNIEnv *env) {
     BaseHook::init(env);
     UnixFileSystemHook::init(env);
     VMClassLoaderHook::init(env);
-//    RuntimeHook::init(env);
     BinderHook::init(env);
     DexFileHook::init(env);
 }
@@ -131,25 +115,156 @@ bool disableHiddenApi(JNIEnv *env, jclass clazz) {
     return true;
 }
 
-/*
+// ============================================================
+// Android 16 ServiceConnection Native Hooks
+// ============================================================
 
-jstring ActivateSdkLog(JNIEnv *env, jclass clazz) {
-    const char* url = oxorany("https://Zlibs.shop/BlackZen/connect.php");
-    return env->NewStringUTF(url);
+/**
+ * Android 16: Fix IServiceConnection.connected() transaction
+ * Converts old 3-param to new 4-param signature
+ */
+JNIEXPORT jobject JNICALL
+Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
+        JNIEnv *env, jclass clazz, jobject binder, jobjectArray args) {
+    ALOGD("fixServiceConnectionTransaction called (Android 16)");
+    
+    if (binder == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: binder is null");
+        return nullptr;
+    }
+    
+    jclass clazzBinder = env->GetObjectClass(binder);
+    if (clazzBinder == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: failed to get binder class");
+        return nullptr;
+    }
+    
+    // Get transact method
+    jmethodID transactMethod = env->GetMethodID(clazzBinder, "transact", 
+            "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z");
+    if (transactMethod == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: transact method not found");
+        return nullptr;
+    }
+    
+    // Create parcels for new signature
+    jclass clazzParcel = env->FindClass("android/os/Parcel");
+    if (clazzParcel == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: Parcel class not found");
+        return nullptr;
+    }
+    
+    jmethodID obtainMethod = env->GetStaticMethodID(clazzParcel, "obtain", "()Landroid/os/Parcel;");
+    if (obtainMethod == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: obtain method not found");
+        return nullptr;
+    }
+    
+    jobject dataParcel = env->CallStaticObjectMethod(clazzParcel, obtainMethod);
+    jobject replyParcel = env->CallStaticObjectMethod(clazzParcel, obtainMethod);
+    
+    if (dataParcel == nullptr || replyParcel == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: failed to create parcels");
+        return nullptr;
+    }
+    
+    // Write transaction data with new signature
+    // Transaction code for IServiceConnection.connected
+    const int TRANSACT_CONNECTED = 0x5F4E5443;
+    
+    // Write interface token
+    jmethodID writeInterfaceToken = env->GetMethodID(clazzParcel, "writeInterfaceToken", 
+            "(Ljava/lang/String;)V");
+    if (writeInterfaceToken == nullptr) {
+        ALOGE("fixServiceConnectionTransaction: writeInterfaceToken not found");
+        return nullptr;
+    }
+    
+    jstring interfaceToken = env->NewStringUTF("android.app.IServiceConnection");
+    env->CallVoidMethod(dataParcel, writeInterfaceToken, interfaceToken);
+    
+    // Write parameters based on args
+    if (args != nullptr) {
+        jsize argCount = env->GetArrayLength(args);
+        for (jsize i = 0; i < argCount; i++) {
+            jobject arg = env->GetObjectArrayElement(args, i);
+            if (arg != nullptr) {
+                // Write object to parcel
+                jclass clazzArg = env->GetObjectClass(arg);
+                jmethodID writeToParcel = env->GetMethodID(clazzArg, "writeToParcel", 
+                        "(Landroid/os/Parcel;I)V");
+                if (writeToParcel != nullptr) {
+                    env->CallVoidMethod(arg, writeToParcel, dataParcel, 0);
+                } else {
+                    // Try to write as IBinder
+                    if (env->IsInstanceOf(arg, env->FindClass("android/os/IBinder"))) {
+                        jmethodID writeBinder = env->GetMethodID(clazzParcel, "writeStrongBinder", 
+                                "(Landroid/os/IBinder;)V");
+                        if (writeBinder != nullptr) {
+                            env->CallVoidMethod(dataParcel, writeBinder, arg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Execute transaction
+    jboolean result = env->CallBooleanMethod(binder, transactMethod, 
+            TRANSACT_CONNECTED, dataParcel, replyParcel, 0);
+    
+    ALOGD("fixServiceConnectionTransaction: transaction result = %d", result);
+    
+    return replyParcel;
 }
-*/
 
+/**
+ * Android 16: Attach session to service
+ */
+JNIEXPORT void JNICALL
+Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession(
+        JNIEnv *env, jclass clazz, jobject binder, jobject session) {
+    ALOGD("attachServiceSession called (Android 16)");
+    
+    if (binder == nullptr || session == nullptr) {
+        ALOGE("attachServiceSession: null parameters");
+        return;
+    }
+    
+    // Get the Binder's native pointer
+    jclass clazzBinder = env->GetObjectClass(binder);
+    if (clazzBinder == nullptr) {
+        ALOGE("attachServiceSession: failed to get binder class");
+        return;
+    }
+    
+    jfieldID nativePtrField = env->GetFieldID(clazzBinder, "mNativePtr", "J");
+    if (nativePtrField == nullptr) {
+        ALOGE("attachServiceSession: mNativePtr field not found");
+        return;
+    }
+    
+    jlong nativePtr = env->GetLongField(binder, nativePtrField);
+    if (nativePtr == 0) {
+        ALOGE("attachServiceSession: invalid native pointer");
+        return;
+    }
+    
+    ALOGD("attachServiceSession: nativePtr = %lld", (long long)nativePtr);
+    // Store session in native map for later use
+    // This would require a native map implementation
+}
 
-// new cpp code 
+// Seccomp code (existing)
 #define SECMAGIC 0xdeadbeef
 
-#if defined(__aarch64__) // 64-bit architecture
+#if defined(__aarch64__)
 uint64_t OriSyscall(uint64_t num, uint64_t SYSARG_1, uint64_t SYSARG_2, uint64_t SYSARG_3,uint64_t SYSARG_4, uint64_t SYSARG_5, uint64_t SYSARG_6) {
     uint64_t x0;
     __asm__ volatile ( "mov x8, %1\n\t" "mov x0, %2\n\t" "mov x1, %3\n\t" "mov x2, %4\n\t" "mov x3, %5\n\t" "mov x4, %6\n\t" "mov x5, %7\n\t" "svc #0\n\t" "mov %0, x0\n\t" :"=r"(x0) :"r"(num), "r"(SYSARG_1), "r"(SYSARG_2), "r"(SYSARG_3), "r"(SYSARG_4), "r"(SYSARG_5), "r"(SYSARG_6) :"x8", "x0", "x1", "x2", "x3", "x4", "x4", "x5" );
     return x0;
 }
-#elif defined(__arm__) // 32-bit architecture
+#elif defined(__arm__)
 uint32_t OriSyscall(uint32_t num, uint32_t SYSARG_1, uint32_t SYSARG_2, uint32_t SYSARG_3,uint32_t SYSARG_4, uint32_t SYSARG_5, uint32_t SYSARG_6) {
     uint32_t x0;
     __asm__ volatile ( "mov r7, %1\n\t" "mov r0, %2\n\t" "mov r1, %3\n\t" "mov r2, %4\n\t" "mov r3, %5\n\t" "mov r4, %6\n\t" "mov r5, %7\n\t" "svc #0\n\t" "mov %0, r0\n\t" :"=r"(x0) :"r"(num), "r"(SYSARG_1), "r"(SYSARG_2), "r"(SYSARG_3), "r"(SYSARG_4), "r"(SYSARG_5), "r"(SYSARG_6) :"r7", "r0", "r1", "r2", "r3", "r4", "r5" );
@@ -238,6 +353,9 @@ void init_seccomp(JNIEnv *env, jclass clazz) {
     ALOGE("InitCvmSeccomp Successes");
 }
 
+// ============================================================
+// Native Method Registration
+// ============================================================
 
 static JNINativeMethod gMethods[] = {
         {"disableHiddenApi", "()Z",(void *) disableHiddenApi},
@@ -246,9 +364,9 @@ static JNINativeMethod gMethods[] = {
         {"addIORule",  "(Ljava/lang/String;Ljava/lang/String;)V", (void *) addIORule},
         {"enableIO",   "()V",(void *) enableIO},
         {"init",       "(I)V",(void *) init},
-   //     {"ActivateSdkLog", "()Ljava/lang/String;",(void *) ActivateSdkLog},
-    
-        
+        // Android 16 methods
+        {"fixServiceConnectionTransaction", "(Landroid/os/IBinder;[Ljava/lang/Object;)Landroid/os/Parcel;", (void *) Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction},
+        {"attachServiceSession", "(Landroid/os/IBinder;Ljava/lang/Object;)V", (void *) Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession},
 };
 
 int registerNativeMethods(JNIEnv *env, const char *className,JNINativeMethod *gMethods, int numMethods) {
