@@ -10,10 +10,16 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import black.android.app.IServiceConnectionO;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
+/**
+ * Android 16 compatible ServiceConnectionDelegate
+ * Handles all Android versions from 8 to 16
+ * 
+ * Key fix: Android 16 uses IBinderSession (4th parameter) which is a Binder object
+ */
 public class ServiceConnectionDelegate extends IServiceConnection.Stub {
+    private static final String TAG = "ServiceConnectionDelegate";
     private static final Map<IBinder, ServiceConnectionDelegate> sServiceConnectDelegate = new HashMap<>();
     private final IServiceConnection mConn;
     private final ComponentName mComponentName;
@@ -59,93 +65,147 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
         return delegate;
     }
 
+    // ============================================================
+    // Android 8-14: 2-param connected()
+    // Called by system for older Android versions
+    // ============================================================
     @Override
     public void connected(ComponentName name, IBinder service) throws RemoteException {
         dispatchConnected(name, service, null, false);
     }
 
+    // ============================================================
+    // Android 8-15: 3-param connected()
+    // Called by system for Android 8-15
+    // ============================================================
     public void connected(ComponentName name, IBinder service, boolean dead) throws RemoteException {
         dispatchConnected(name, service, null, dead);
     }
 
+    // ============================================================
+    // Android 15-16: 4-param connected() with session
+    // Called by system for Android 15-16
+    // ============================================================
     public void connected(ComponentName name, IBinder service, Object session, boolean dead) throws RemoteException {
         dispatchConnected(name, service, session, dead);
     }
 
+    // ============================================================
+    // Core Dispatch Logic - FIXED FOR ANDROID 16
+    // ============================================================
     private void dispatchConnected(ComponentName name, IBinder service, Object session, boolean dead) throws RemoteException {
         try {
+            // Get all methods of the connection
+            Method[] methods = mConn.getClass().getMethods();
+            
+            // Android 16: Try 4-param with IBinderSession first
             if (BuildCompat.isAndroid16()) {
-                // Android 16: Try 4-param first
-                callConnectedMethod(mConn, name, service, session, dead);
-            } else if (BuildCompat.isAndroid15()) {
-                // Android 15: Try 4-param, fallback to 3-param
-                try {
-                    callConnectedMethod(mConn, name, service, session, dead);
-                } catch (Throwable e) {
-                    callConnectedMethod(mConn, name, service, dead);
+                // Try to find and invoke 4-param method
+                for (Method method : methods) {
+                    if (!"connected".equals(method.getName())) continue;
+                    if (method.getParameterTypes().length == 4) {
+                        try {
+                            method.setAccessible(true);
+                            method.invoke(mConn, name, service, session, dead);
+                            return;
+                        } catch (Throwable ignored) {
+                            // Continue to next method
+                        }
+                    }
                 }
-            } else if (BuildCompat.isOreo()) {
-                // Android 8-14: Use 3-param or 2-param
-                try {
-                    callConnectedMethod(mConn, name, service, dead);
-                } catch (Throwable e) {
-                    callConnectedMethod(mConn, name, service);
-                }
-            } else {
-                // Fallback: Try all signatures
-                callConnectedMethod(mConn, name, service, session, dead);
             }
+            
+            // Android 15: Try 4-param with Object session
+            if (BuildCompat.isAndroid15()) {
+                for (Method method : methods) {
+                    if (!"connected".equals(method.getName())) continue;
+                    if (method.getParameterTypes().length == 4) {
+                        try {
+                            method.setAccessible(true);
+                            method.invoke(mConn, name, service, session, dead);
+                            return;
+                        } catch (Throwable ignored) {
+                            // Continue to next method
+                        }
+                    }
+                }
+            }
+            
+            // Android 8-15: Try 3-param
+            for (Method method : methods) {
+                if (!"connected".equals(method.getName())) continue;
+                if (method.getParameterTypes().length == 3) {
+                    try {
+                        method.setAccessible(true);
+                        method.invoke(mConn, name, service, dead);
+                        return;
+                    } catch (Throwable ignored) {
+                        // Continue to next method
+                    }
+                }
+            }
+            
+            // Android 8-14: Try 2-param
+            for (Method method : methods) {
+                if (!"connected".equals(method.getName())) continue;
+                if (method.getParameterTypes().length == 2) {
+                    try {
+                        method.setAccessible(true);
+                        method.invoke(mConn, name, service);
+                        return;
+                    } catch (Throwable ignored) {
+                        // Continue to next method
+                    }
+                }
+            }
+            
+            // ============================================================
+            // ULTIMATE FALLBACK: Try all possible combinations
+            // ============================================================
+            Object[][] testArgs = {
+                {name, service, session, dead},  // 4-param with session
+                {name, service, dead},           // 3-param
+                {name, service}                  // 2-param
+            };
+            
+            for (Object[] args : testArgs) {
+                for (Method method : methods) {
+                    if (!"connected".equals(method.getName())) continue;
+                    if (method.getParameterTypes().length != args.length) continue;
+                    
+                    try {
+                        method.setAccessible(true);
+                        method.invoke(mConn, args);
+                        return;
+                    } catch (Throwable ignored) {
+                        // Continue to next
+                    }
+                }
+            }
+            
+            // ============================================================
+            // LAST RESORT: Try to call via IServiceConnectionO.Compat
+            // ============================================================
+            try {
+                IServiceConnectionO.Compat.connected(mConn, name, service, session, dead);
+                return;
+            } catch (Throwable ignored) {
+                // Continue to final fallback
+            }
+            
+            // ============================================================
+            // FINAL FALLBACK: Direct 2-param call
+            // ============================================================
+            mConn.connected(name, service);
+            
         } catch (Throwable e) {
+            // Ultimate fallback: try 2-param
             try {
                 mConn.connected(name, service);
             } catch (Throwable ignored) {
                 e.printStackTrace();
+                throw new RemoteException("Failed to call connected()", e);
             }
         }
-    }
-
-    private void callConnectedMethod(IServiceConnection conn, Object... args) throws Throwable {
-        if (conn == null) return;
-        
-        Method[] methods = conn.getClass().getMethods();
-        for (Method method : methods) {
-            if (!"connected".equals(method.getName())) continue;
-            
-            Class<?>[] paramTypes = method.getParameterTypes();
-            if (paramTypes.length != args.length) continue;
-            
-            boolean match = true;
-            for (int i = 0; i < paramTypes.length; i++) {
-                Object arg = args[i];
-                if (arg == null) {
-                    if (paramTypes[i].isPrimitive()) {
-                        match = false;
-                        break;
-                    }
-                    continue;
-                }
-                if (!paramTypes[i].isAssignableFrom(arg.getClass())) {
-                    match = false;
-                    break;
-                }
-            }
-            
-            if (match) {
-                method.setAccessible(true);
-                method.invoke(conn, args);
-                return;
-            }
-        }
-        
-        for (Method method : methods) {
-            if (!"connected".equals(method.getName())) continue;
-            if (method.getParameterTypes().length == args.length) {
-                method.setAccessible(true);
-                method.invoke(conn, args);
-                return;
-            }
-        }
-        
-        throw new NoSuchMethodException("No connected() method with " + args.length + " parameters found");
     }
 }
