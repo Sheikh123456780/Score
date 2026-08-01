@@ -314,7 +314,7 @@ public class BActivityThread extends IBActivityThread.Stub {
             BRCompatibility.get().setTargetSdkVersion(applicationInfo.targetSdkVersion);
         }
 
-        NativeCore.init(Build.VERSION.SDK_INT);
+        NativeCore.initCore(Build.VERSION.SDK_INT);
         assert packageContext != null;
         IOCore.get().enableRedirect(packageContext);
 
