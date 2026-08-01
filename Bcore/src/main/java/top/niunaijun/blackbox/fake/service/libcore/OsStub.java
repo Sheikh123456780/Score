@@ -1,7 +1,6 @@
 package top.niunaijun.blackbox.fake.service.libcore;
 
 import android.os.Process;
-
 import java.lang.reflect.Method;
 
 import black.libcore.io.BRLibcore;
@@ -14,12 +13,7 @@ import top.niunaijun.blackbox.fake.hook.ProxyMethod;
 import top.niunaijun.blackbox.utils.Reflector;
 
 /**
- * Created by Milk on 4/9/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Android 16 Compatible OsStub with Storage Verification Fix
  */
 public class OsStub extends ClassInvocationStub {
     public static final String TAG = "OsStub";
@@ -57,9 +51,6 @@ public class OsStub extends ClassInvocationStub {
                 if (args[i] instanceof String && ((String) args[i]).startsWith("/")) {
                     String orig = (String) args[i];
                     args[i] = IOCore.get().redirectPath(orig);
-//                    if (!ObjectsCompat.equals(orig, args[i])) {
-//                        Log.d(TAG, "redirectPath: " + orig + "  => " + args[i]);
-//                    }
                 }
             }
         }
@@ -68,7 +59,6 @@ public class OsStub extends ClassInvocationStub {
 
     @ProxyMethod("getuid")
     public static class getuid extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             int callUid = (int) method.invoke(who, args);
@@ -78,7 +68,6 @@ public class OsStub extends ClassInvocationStub {
 
     @ProxyMethod("stat")
     public static class stat extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             Object invoke = null;
@@ -87,15 +76,47 @@ public class OsStub extends ClassInvocationStub {
             } catch (Throwable e) {
                 throw e.getCause();
             }
-            Reflector.with(invoke).field("st_uid").set(getFakeUid(-1));
+            if (invoke != null) {
+                Reflector.with(invoke).field("st_uid").set(getFakeUid(-1));
+            }
             return invoke;
+        }
+    }
+
+    // 🔥 Added lstat hook for game integrity checks
+    @ProxyMethod("lstat")
+    public static class lstat extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            Object invoke = null;
+            try {
+                invoke = method.invoke(who, args);
+            } catch (Throwable e) {
+                throw e.getCause();
+            }
+            if (invoke != null) {
+                Reflector.with(invoke).field("st_uid").set(getFakeUid(-1));
+            }
+            return invoke;
+        }
+    }
+
+    // 🔥 Added access hook to bypass native Android 16 file locks
+    @ProxyMethod("access")
+    public static class access extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            try {
+                return method.invoke(who, args);
+            } catch (Throwable e) {
+                return true; // Force-grant permission for game file verification
+            }
         }
     }
 
     private static int getFakeUid(int callUid) {
         if (callUid > 0 && callUid <= Process.FIRST_APPLICATION_UID)
             return callUid;
-//            Log.d(TAG, "getuid: " + BActivityThread.getAppPackageName() + ", " + BActivityThread.getAppUid());
         if (BActivityThread.isThreadInit() && BActivityThread.currentActivityThread().isInit()) {
             return BActivityThread.getBAppId();
         } else {
