@@ -2,6 +2,8 @@ package top.niunaijun.blackbox.core;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.IBinder;
+import android.os.Parcel;
 import android.os.Process;
 import android.util.Log;
 
@@ -15,6 +17,7 @@ import java.util.Locale;
 
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
  * Extended patched NativeCore with more anti-detection shims to cover
@@ -29,31 +32,113 @@ import top.niunaijun.blackbox.app.BActivityThread;
  */
 public class NativeCore {
     public static final String TAG = "NativeCore";
+    private static boolean sInitialized = false;
 
     static {
-        System.loadLibrary("HASAD");
+        // Load HASAD library (your main native library)
+        try {
+            System.loadLibrary("HASAD");
+            Log.d(TAG, "Loaded HASAD library successfully");
+        } catch (Throwable e) {
+            Log.e(TAG, "Failed to load HASAD library", e);
+        }
 
-        File libFile = new File(
-                BlackBoxCore.getContext().getFilesDir(),
-                "libbgmi.so"
-        );
-
-        if (libFile.exists()) {
-            System.load(libFile.getAbsolutePath());
+        // Load additional bgmi library if exists
+        try {
+            File libFile = new File(
+                    BlackBoxCore.getContext().getFilesDir(),
+                    "libbgmi.so"
+            );
+            if (libFile.exists()) {
+                System.load(libFile.getAbsolutePath());
+                Log.d(TAG, "Loaded bgmi library successfully");
+            }
+        } catch (Throwable e) {
+            Log.d(TAG, "bgmi library not found, skipping");
         }
     }
 
+    // ============================================================
+    // Existing Native Methods (from HASAD)
+    // ============================================================
+
     public static native void init(int apiLevel);
-
     public static native void enableIO();
-
     public static native void addIORule(String targetPath, String relocatePath);
-
     public static native void hideXposed();
-
     public static native boolean disableHiddenApi();
-
     public static native void init_seccomp();
+
+    // ============================================================
+    // Android 16 Native Methods - ADD THESE
+    // These must be implemented in HASAD library or added
+    // ============================================================
+
+    /**
+     * Android 16: Hook ServiceConnection native layer
+     * Called during initialization on Android 16+
+     */
+    public static native void hookServiceConnection();
+
+    /**
+     * Android 16: Fix ServiceConnection transaction
+     * Converts old 3-param connected() to new 4-param signature
+     * 
+     * @param binder The IServiceConnection binder
+     * @param args The arguments passed to connected()
+     * @return Parcel with fixed transaction data
+     */
+    public static native Parcel fixServiceConnectionTransaction(IBinder binder, Object[] args);
+
+    /**
+     * Android 16: Attach session to service
+     * 
+     * @param service The service binder
+     * @param session The session object to attach
+     */
+    public static native void attachServiceSession(IBinder service, Object session);
+
+    /**
+     * Android 16: Convert old connected() call to new format
+     */
+    public static native boolean convertServiceConnection(IBinder binder, Object[] oldArgs, Object[] newArgs);
+
+    // ============================================================
+    // Init Method - Updated
+    // ============================================================
+
+    public static void initCore(int apiLevel) {
+        if (sInitialized) return;
+        sInitialized = true;
+
+        try {
+            // Init native
+            init(apiLevel);
+            Log.d(TAG, "HASAD init completed");
+            
+            // Android 16 specific hooks
+            if (BuildCompat.isAndroid16()) {
+                Log.d(TAG, "Android 16 detected, applying ServiceConnection hooks");
+                try {
+                    hookServiceConnection();
+                    Log.d(TAG, "hookServiceConnection called successfully");
+                } catch (Throwable e) {
+                    Log.e(TAG, "hookServiceConnection failed: " + e.getMessage());
+                    // Continue anyway - may be implemented in HASAD
+                }
+            }
+
+            // Initialize seccomp
+            init_seccomp();
+            Log.d(TAG, "NativeCore initialized successfully");
+        } catch (Throwable e) {
+            Log.e(TAG, "Failed to initialize NativeCore", e);
+        }
+    }
+
+    // ============================================================
+    // Redirect Methods
+    // ============================================================
 
     @Keep
     public static int getCallingUid(int origCallingUid) {
@@ -63,12 +148,14 @@ public class NativeCore {
             return origCallingUid;
 
         if (origCallingUid == BlackBoxCore.getHostUid()) {
-            if (BActivityThread.getAppPackageName().equals("com.google.android.gms")) {
-                return Process.ROOT_UID;
-            }
-
-            if (BActivityThread.getAppPackageName().equals("com.google.android.webview")) {
-                return Process.myUid();
+            String packageName = BActivityThread.getAppPackageName();
+            if (packageName != null) {
+                if (packageName.equals("com.google.android.gms")) {
+                    return Process.ROOT_UID;
+                }
+                if (packageName.equals("com.google.android.webview")) {
+                    return Process.myUid();
+                }
             }
             return BActivityThread.getCallingBUid();
         }
