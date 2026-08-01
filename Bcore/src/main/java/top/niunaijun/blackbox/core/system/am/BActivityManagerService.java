@@ -27,16 +27,13 @@ import top.niunaijun.blackbox.entity.am.ReceiverData;
 import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
 import top.niunaijun.blackbox.utils.Slog;
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 import static android.content.pm.PackageManager.GET_META_DATA;
 
 /**
  * Created by Milk on 3/31/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Android 16 compatible BActivityManagerService
  */
 public class BActivityManagerService extends IBActivityManagerService.Stub implements ISystemService {
     public static final String TAG = "BActivityManagerService";
@@ -307,6 +304,17 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         UserSpace userSpace = getOrCreateSpaceLocked(userId);
         synchronized (userSpace.mActiveServices) {
             return userSpace.mActiveServices.bindService(service, binder, resolvedType, userId);
+        }
+    }
+
+    /**
+     * Android 16+ bindService with session
+     */
+    @Override
+    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, Object session) throws RemoteException {
+        UserSpace userSpace = getOrCreateSpaceLocked(userId);
+        synchronized (userSpace.mActiveServices) {
+            return userSpace.mActiveServices.bindServiceV2(service, binder, resolvedType, userId, session);
         }
     }
 
