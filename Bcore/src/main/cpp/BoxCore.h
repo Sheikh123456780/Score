@@ -26,5 +26,52 @@ public:
     static jlongArray loadEmptyDex(JNIEnv *env);
 };
 
+// ============================================================
+// JNI Function Prototypes for Android 16
+// These must match the Java NativeCore class methods
+// ============================================================
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Android 16 ServiceConnection methods
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_hookServiceConnection(JNIEnv*, jclass);
+
+JNIEXPORT jobject JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_fixServiceConnectionTransaction(
+    JNIEnv*, jclass, jobject, jobjectArray);
+
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_attachServiceSession(
+    JNIEnv*, jclass, jobject, jobject);
+
+JNIEXPORT jboolean JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_convertServiceConnection(
+    JNIEnv*, jclass, jobject, jobjectArray, jobjectArray);
+
+// Existing methods
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_init(JNIEnv*, jclass, jint);
+
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_enableIO(JNIEnv*, jclass);
+
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_addIORule(JNIEnv*, jclass, jstring, jstring);
+
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_hideXposed(JNIEnv*, jclass);
+
+JNIEXPORT jboolean JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_disableHiddenApi(JNIEnv*, jclass);
+
+JNIEXPORT void JNICALL 
+Java_top_niunaijun_blackbox_core_NativeCore_init_seccomp(JNIEnv*, jclass);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //VIRTUALM_VMCORE_H
