@@ -217,21 +217,22 @@ public class ActiveServices {
     }
 
     public UnbindRecord onServiceUnbind(Intent proxyIntent, int userId) throws RemoteException {
-        if (proxyIntent == null)
-            return null;
-        ProxyServiceRecord proxyServiceRecord = ProxyServiceRecord.create(proxyIntent);
-        ComponentName component = proxyServiceRecord.mServiceIntent.getComponent();
+    if (proxyIntent == null)
+        return null;
+    ProxyServiceRecord proxyServiceRecord = ProxyServiceRecord.create(proxyIntent);
+    ComponentName component = proxyServiceRecord.mServiceIntent.getComponent();
 
-        RunningServiceRecord runningServiceRecord = findRunningServiceRecord(proxyServiceRecord.mServiceIntent);
-        if (runningServiceRecord == null)
-            return null;
-        UnbindRecord record = new UnbindRecord();
-        record.setComponentName(component);
-        record.setBindCount(runningServiceRecord.mBindCount.get());
-        record.setStartId(runningServiceRecord.mStartId.get());
-        record.setSession(runningServiceRecord.mSession);
-        return record;
-    }
+    RunningServiceRecord runningServiceRecord = findRunningServiceRecord(proxyServiceRecord.mServiceIntent);
+    if (runningServiceRecord == null)
+        return null;
+    UnbindRecord record = new UnbindRecord();
+    record.setComponentName(component);
+    record.setBindCount(runningServiceRecord.mBindCount.get());
+    record.setStartId(runningServiceRecord.mStartId.get());
+    // Android 16+ session
+    record.setSession(runningServiceRecord.mSession);
+    return record;
+}
 
     private Intent createStubServiceIntent(Intent targetIntent, ServiceInfo serviceInfo, ProcessRecord processRecord, RunningServiceRecord runningServiceRecord) {
         Intent stub = new Intent();
