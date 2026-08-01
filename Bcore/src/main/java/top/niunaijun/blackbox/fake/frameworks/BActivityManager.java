@@ -98,14 +98,24 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
     }
 
     /**
-     * Android 16 compatible bindService
-     * Handles new session parameter internally
+     * Android 8-15 bindService
      */
     public Intent bindService(Intent service, IBinder binder, String resolvedType, int userId) {
         try {
-            // Android 16+ uses new bindService signature
+            return getService().bindService(service, binder, resolvedType, userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Android 16+ bindService with session (IBinder for AIDL compatibility)
+     */
+    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, IBinder session) {
+        try {
             if (BuildCompat.isAndroid16()) {
-                return getService().bindServiceV2(service, binder, resolvedType, userId, null);
+                return getService().bindServiceV2(service, binder, resolvedType, userId, session);
             }
             return getService().bindService(service, binder, resolvedType, userId);
         } catch (RemoteException e) {
@@ -115,12 +125,17 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
     }
 
     /**
-     * Android 16+ bindService with session
+     * Android 16+ bindService with Object session (converted to IBinder)
      */
-    public Intent bindService(Intent service, IBinder binder, String resolvedType, int userId, Object session) {
+    public Intent bindServiceWithSession(Intent service, IBinder binder, String resolvedType, int userId, Object session) {
         try {
-            if (BuildCompat.isAndroid16()) {
-                return getService().bindServiceV2(service, binder, resolvedType, userId, session);
+            if (BuildCompat.isAndroid16() && session != null) {
+                // Convert Object to IBinder if possible
+                IBinder sessionBinder = null;
+                if (session instanceof IBinder) {
+                    sessionBinder = (IBinder) session;
+                }
+                return getService().bindServiceV2(service, binder, resolvedType, userId, sessionBinder);
             }
             return getService().bindService(service, binder, resolvedType, userId);
         } catch (RemoteException e) {
