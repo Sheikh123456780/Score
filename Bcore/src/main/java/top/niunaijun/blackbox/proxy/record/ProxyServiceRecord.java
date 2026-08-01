@@ -8,11 +8,7 @@ import top.niunaijun.blackbox.utils.compat.BundleCompat;
 
 /**
  * Created by Milk on 4/1/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Android 16 compatible ProxyServiceRecord
  */
 public class ProxyServiceRecord {
     public Intent mServiceIntent;
@@ -20,6 +16,9 @@ public class ProxyServiceRecord {
     public IBinder mToken;
     public int mUserId;
     public int mStartId;
+    
+    // Android 16+ session
+    private transient Object mSession;
 
     public ProxyServiceRecord(Intent serviceIntent, ServiceInfo serviceInfo, IBinder token, int userId, int startId) {
         mServiceIntent = serviceIntent;
@@ -44,5 +43,13 @@ public class ProxyServiceRecord {
         int startId = intent.getIntExtra("_B_|_start_id_", 0);
         IBinder token = BundleCompat.getBinder(intent, "_B_|_token_");
         return new ProxyServiceRecord(target, serviceInfo, token, userId, startId);
+    }
+
+    public Object getSession() {
+        return mSession;
+    }
+
+    public void setSession(Object session) {
+        this.mSession = session;
     }
 }
