@@ -334,6 +334,8 @@
             android:name="top.niunaijun.blackbox.core.system.SystemCallProvider"
             android:authorities="${applicationId}.blackbox.SystemCallProvider"
             android:exported="false"
+            android:hardwareAccelerated="true"
+    android:largeHeap="true"
             android:process="@string/black_box_service_name" />
 
         <!--file provider-->
