@@ -1,0 +1,4 @@
+
+include ':Bcore'
+
+rootProject.name = "shayksdk"
