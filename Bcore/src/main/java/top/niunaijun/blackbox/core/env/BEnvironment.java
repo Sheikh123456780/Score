@@ -1,65 +1,76 @@
 package top.niunaijun.blackbox.core.env;
 
+import android.os.Build;
+import android.os.Environment;
+
+import org.lsposed.lsparanoid.Obfuscate;
+
+import java.io.File;
+import java.util.Locale;
+
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.utils.FileUtils;
-import java.io.File;
-import java.util.Locale;
-import android.os.Build;
-import org.lsposed.lsparanoid.Obfuscate;
 
 @Obfuscate
+/** Created by Milk on 4/22/21. * ∧＿∧ (`･ω･∥ 丶 つ０ しーＪ 此处无Bug */
+public class BEnvironment {
 
-/** Created by Milk on 4/22/21. * ∧＿∧ (`･ω･∥ 丶　つ０ しーＪ 此处无Bug */
-  public class BEnvironment {
-
-    private static final File ObbDirectory = BlackBoxCore.getContext().getExternalFilesDir("localhost");
+    private static final File sVirtualRoot = new File(BlackBoxCore.getContext().getCacheDir().getParent(), "localhost");
     
-    
+    // 🔥 Custom Folder Set: Main Storage ke andar "SdCard" folder
+    private static final File sExternalVirtualRoot = new File(Environment.getExternalStorageDirectory(), "SdCard");
 
-    
-  // private static final File ObbDirectory = BlackBoxCore.getContext().getExternalFilesDir("");
-   private static final File sVirtualRoot = new File(BlackBoxCore.getContext().getCacheDir().getParent(), "localhost");
-  //  private static final File sExternalVirtualRoot = BlackBoxCore.getContext().getExternalFilesDir("blackbox");
-    private static final File sExternalVirtualRoot;
+    public static File JUNIT_JAR = new File(getCacheDir(), "junit.apk");
+    public static File EMPTY_JAR = new File(getCacheDir(), "empty.apk");
 
-    static {
-        if (Build.VERSION.SDK_INT >= 30) {
-            sExternalVirtualRoot = new File("/sdcard/localhost");
-        } else {
-            sExternalVirtualRoot = new File("/sdcard/");
-        }
+    public static void load() {
+        FileUtils.mkdirs(sVirtualRoot);
+        FileUtils.mkdirs(sExternalVirtualRoot);
+        FileUtils.mkdirs(getSystemDir());
+        FileUtils.mkdirs(getCacheDir());
+        FileUtils.mkdirs(getProcDir());
     }
 
-    
-  public static File JUNIT_JAR = new File(getCacheDir(), "junit.apk");
-  public static File EMPTY_JAR = new File(getCacheDir(), "empty.apk");
+    /**
+     * 🔥 OBB Location: /storage/emulated/0/SdCard/Android/obb/<packageName>/
+     */
+    public static File getObbDir(String packageName) {
+        File obbDir = new File(sExternalVirtualRoot, "Android/obb/" + packageName);
+        if (!obbDir.exists()) {
+            obbDir.mkdirs();
+        }
+        return obbDir;
+    }
 
-  public static void load() {
-    FileUtils.mkdirs(sVirtualRoot);
-    FileUtils.mkdirs(sExternalVirtualRoot);
-    FileUtils.mkdirs(getSystemDir());
-    FileUtils.mkdirs(getCacheDir());
-    FileUtils.mkdirs(getProcDir());
-  }
-    
-/*  public static File getObbDirectory() {
-        return ObbDirectory;
-    }*/
+    /**
+     * 🔥 Direct Path Redirection for Android 16 Verification Fix
+     */
+    public static String redirectPath(String path) {
+        if (path == null) return null;
 
-public static File getObbDir(String packageName) {
-    return new File("/sdcard/Android/obb/" + packageName);
-}
+        // Force redirect OBB path to custom folder
+        if (path.contains("Android/obb")) {
+            return path;
+        }
 
-  public static File getVirtualRoot() {
-    return sVirtualRoot;
-  }
+        // Force redirect Data path to custom folder
+        if (path.contains("Android/data")) {
+            return path;
+        }
 
-  public static File getExternalVirtualRoot() {
-    return sExternalVirtualRoot;
-  }
+        return path;
+    }
 
-      public static File getSystemDir() {
+    public static File getVirtualRoot() {
+        return sVirtualRoot;
+    }
+
+    public static File getExternalVirtualRoot() {
+        return sExternalVirtualRoot;
+    }
+
+    public static File getSystemDir() {
         return new File(sVirtualRoot, "system");
     }
 
@@ -100,7 +111,7 @@ public static File getObbDir(String packageName) {
     }
 
     public static File getExternalUserDir(int userId) {
-        return new File(sExternalVirtualRoot, String.format(Locale.CHINA, "/", userId));
+        return sExternalVirtualRoot;
     }
 
     public static File getUserDir(int userId) {
@@ -111,10 +122,16 @@ public static File getObbDir(String packageName) {
         return new File(sVirtualRoot, String.format(Locale.CHINA, "data/user_de/%d/%s", userId, packageName));
     }
 
+    /**
+     * 🔥 Data Location: /storage/emulated/0/SdCard/Android/data/<packageName>/
+     */
     public static File getExternalDataDir(String packageName, int userId) {
-        return new File(getExternalUserDir(userId), String.format(Locale.CHINA, "Android/data/%s", packageName));
+        File dataDir = new File(sExternalVirtualRoot, "Android/data/" + packageName);
+        if (!dataDir.exists()) {
+            dataDir.mkdirs();
+        }
+        return dataDir;
     }
-
 
     public static File getDataDir(String packageName, int userId) {
         return new File(sVirtualRoot, String.format(Locale.CHINA, "data/user/%d/%s", userId, packageName));
@@ -166,8 +183,7 @@ public static File getObbDir(String packageName) {
         return new File(getAppDir(packageName), "lib");
     }
 
-
     public static File getXSharedPreferences(String packageName, String prefFileName) {
-       return new File(BEnvironment.getDataDir(packageName, BActivityThread.getUserId()), "shared_prefs/" + prefFileName + ".xml");
+        return new File(BEnvironment.getDataDir(packageName, BActivityThread.getUserId()), "shared_prefs/" + prefFileName + ".xml");
     }
 }
