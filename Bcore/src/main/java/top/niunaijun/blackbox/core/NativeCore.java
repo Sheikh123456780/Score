@@ -121,12 +121,32 @@ public class NativeCore {
     }
 
     @Keep
-    public static String redirectPath(String path) {
-        return IOCore.get().redirectPath(path);
+public static String redirectPath(String path) {
+    if (path == null)
+        return null;
+
+    if (path.startsWith("/proc/")
+            || path.startsWith("/sys/")
+            || path.startsWith("/dev/")) {
+        return path;
     }
 
+    return IOCore.get().redirectPath(path);
+}
+
     @Keep
-    public static File redirectPath(File path) {
-        return IOCore.get().redirectPath(path);
+public static File redirectPath(File path) {
+    if (path == null)
+        return null;
+
+    String p = path.getAbsolutePath();
+
+    if (p.startsWith("/proc/")
+            || p.startsWith("/sys/")
+            || p.startsWith("/dev/")) {
+        return path;
     }
+
+    return IOCore.get().redirectPath(path);
+}
 }
