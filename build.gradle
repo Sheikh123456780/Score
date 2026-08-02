@@ -32,7 +32,7 @@ ext {
   ndkVersion = '24.0.8215888'
     compileSdkVersion = 34
     buildToolsVersion = '34'
-    targetSdkVersion = 36
+    targetSdkVersion = 34
 
 
 }
