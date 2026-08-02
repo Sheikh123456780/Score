@@ -1,5 +1,6 @@
 package top.niunaijun.blackbox.fake.service;
 
+import android.os.IBinder;
 
 import black.android.hardware.location.BRIContextHubServiceStub;
 import black.android.os.BRServiceManager;
@@ -13,21 +14,31 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 public class IContextHubServiceProxy extends BinderInvocationStub {
 
     public IContextHubServiceProxy() {
-        super(BRServiceManager.get().getService(getServiceName()));
+        super(getContextHubService());
     }
 
     private static String getServiceName() {
         return BuildCompat.isOreo() ? "contexthub" : "contexthub_service";
     }
 
+    private static IBinder getContextHubService() {
+        return BRServiceManager.get().getService(getServiceName());
+    }
+
     @Override
     protected Object getWho() {
-        return BRIContextHubServiceStub.get().asInterface(BRServiceManager.get().getService(getServiceName()));
+        IBinder binder = getContextHubService();
+        if (binder == null) {
+            return null;
+        }
+        return BRIContextHubServiceStub.get().asInterface(binder);
     }
 
     @Override
     protected void inject(Object baseInvocation, Object proxyInvocation) {
-        replaceSystemService(getServiceName());
+        if (getWho() != null) {
+            replaceSystemService(getServiceName());
+        }
     }
 
     @Override
@@ -35,7 +46,7 @@ public class IContextHubServiceProxy extends BinderInvocationStub {
         super.onBindMethod();
         addMethodHook(new ValueMethodProxy("registerCallback", 0));
         addMethodHook(new ValueMethodProxy("getContextHubInfo", null));
-        addMethodHook(new ValueMethodProxy("getContextHubHandles",new int[]{}));
+        addMethodHook(new ValueMethodProxy("getContextHubHandles", new int[]{}));
     }
 
     @Override
