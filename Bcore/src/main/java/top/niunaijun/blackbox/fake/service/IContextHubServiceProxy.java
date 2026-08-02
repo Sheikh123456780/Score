@@ -31,7 +31,11 @@ public class IContextHubServiceProxy extends BinderInvocationStub {
         if (binder == null) {
             return null;
         }
-        return BRIContextHubServiceStub.get().asInterface(binder);
+        try {
+            return BRIContextHubServiceStub.get().asInterface(binder);
+        } catch (Throwable e) {
+            return null;
+        }
     }
 
     @Override
