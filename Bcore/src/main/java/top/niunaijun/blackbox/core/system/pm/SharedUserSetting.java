@@ -70,23 +70,47 @@ public final class SharedUserSetting implements Parcelable {
     }
 
     public static void loadSharedUsers() {
-        Parcel parcel = Parcel.obtain();
-        try {
-            byte[] sharedUsersBytes = FileUtils.toByteArray(BEnvironment.getSharedUserConf());
-            parcel.unmarshall(sharedUsersBytes, 0, sharedUsersBytes.length);
-            parcel.setDataPosition(0);
+    Parcel parcel = Parcel.obtain();
+    try {
+        File file = BEnvironment.getSharedUserConf();
+        if (file == null || !file.exists() || file.length() == 0)
+            return;
 
-            HashMap hashMap = parcel.readHashMap(SharedUserSetting.class.getClassLoader());
-            synchronized (sSharedUsers) {
-                sSharedUsers.clear();
-                sSharedUsers.putAll(hashMap);
+        byte[] bytes = FileUtils.toByteArray(file);
+        if (bytes == null || bytes.length == 0)
+            return;
+
+        parcel.unmarshall(bytes, 0, bytes.length);
+        parcel.setDataPosition(0);
+
+        HashMap<String, SharedUserSetting> map =
+                parcel.readHashMap(SharedUserSetting.class.getClassLoader());
+
+        synchronized (sSharedUsers) {
+            sSharedUsers.clear();
+            if (map != null) {
+                sSharedUsers.putAll(map);
             }
-        } catch (Exception e) {
-//            e.printStackTrace();
-        } finally {
-            parcel.recycle();
         }
+    } catch (Throwable e) {
+        e.printStackTrace();
+
+        // Delete corrupted cache so it will be rebuilt
+        try {
+            File file = BEnvironment.getSharedUserConf();
+            if (file != null && file.exists()) {
+                file.delete();
+            }
+        } catch (Throwable ignored) {
+        }
+
+        synchronized (sSharedUsers) {
+            sSharedUsers.clear();
+        }
+    } finally {
+        parcel.recycle();
     }
+}
 
     @Override
     public int describeContents() {
@@ -100,10 +124,7 @@ public final class SharedUserSetting implements Parcelable {
     this.seInfoTargetSdkVersion = source.readInt();
 }
 
-    public void readFromParcel(Parcel source) {
-        this.name = source.readString();
-        this.userId = source.readInt();
-    }
+    
 
     protected SharedUserSetting(Parcel in) {
     this.name = in.readString();
