@@ -53,12 +53,60 @@ public class BProcessManagerService implements ISystemService {
         return sBProcessManagerService;
     }
 
+    // ========== FIXED: Dynamic directory creation for processes ==========
+    private void ensureProcessDirectories(String packageName, int userId) {
+        try {
+            // Create all directories needed for the process
+            String[] dirs = {
+                BEnvironment.getDataDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getDataFilesDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getDataCacheDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getDataLibDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getDataDatabasesDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getExternalDataDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getExternalDataFilesDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getExternalDataCacheDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getDeDataDir(packageName, userId).getAbsolutePath(),
+                BEnvironment.getAppDir(packageName).getAbsolutePath(),
+                BEnvironment.getAppLibDir(packageName).getAbsolutePath(),
+            };
+            
+            for (String dir : dirs) {
+                if (dir == null) continue;
+                File f = new File(dir);
+                if (!f.exists()) {
+                    boolean created = f.mkdirs();
+                    if (created) {
+                        Slog.d(TAG, "Created process dir: " + dir);
+                    }
+                }
+            }
+            
+            // Also create shared_prefs directory specifically
+            File sharedPrefs = new File(BEnvironment.getDataDir(packageName, userId), "shared_prefs");
+            if (!sharedPrefs.exists()) {
+                sharedPrefs.mkdirs();
+            }
+            
+        } catch (Throwable e) {
+            Slog.w(TAG, "Failed to create process directories: " + e.getMessage());
+        }
+    }
+
+    // ========== FIXED: Start Process with dynamic paths ==========
     public ProcessRecord startProcessLocked(String packageName, String processName, int userId, int bpid, int callingPid) {
         ApplicationInfo info = BPackageManagerService.get().getApplicationInfo(packageName, 0, userId);
-        if (info == null)
+        if (info == null) {
+            Slog.w(TAG, "ApplicationInfo not found for: " + packageName);
             return null;
+        }
+        
+        // FIX: Ensure directories exist before process creation
+        ensureProcessDirectories(packageName, userId);
+        
         ProcessRecord app;
         int buid = BUserHandle.getUid(userId, BPackageManagerService.get().getAppId(packageName));
+        
         synchronized (mProcessLock) {
             Map<String, ProcessRecord> bProcess = mProcessMap.get(buid);
 
@@ -101,6 +149,8 @@ public class BProcessManagerService implements ISystemService {
                 app = null;
             } else {
                 app.pid = getPid(BlackBoxCore.getContext(), ProxyManifest.getProcessName(app.bpid));
+                // FIX: Create process-specific proc directory
+                createProc(app);
             }
         }
         return app;
@@ -127,7 +177,7 @@ public class BProcessManagerService implements ISystemService {
         synchronized (mProcessLock) {
             int callingUid = Binder.getCallingUid();
             int callingPid = Binder.getCallingPid();
-            ProcessRecord app = findProcessByPid(callingPid);;
+            ProcessRecord app = findProcessByPid(callingPid);
             if (app == null) {
                 String stubProcessName = getProcessName(BlackBoxCore.getContext(), callingPid);
                 int bpid = parseBPid(stubProcessName);
@@ -154,13 +204,18 @@ public class BProcessManagerService implements ISystemService {
     }
 
     private boolean initAppProcessL(ProcessRecord record) {
-        Log.d(TAG, "initProcess: " + record.processName);
+        Slog.d(TAG, "initProcess: " + record.processName);
+        
+        // FIX: Ensure directories exist before initializing
+        ensureProcessDirectories(record.getPackageName(), record.userId);
+        
         AppConfig appConfig = record.getClientConfig();
         Bundle bundle = new Bundle();
         bundle.putParcelable(AppConfig.KEY, appConfig);
         Bundle init = ProviderCall.callSafely(record.getProviderAuthority(), "_Black_|_init_process_", null, bundle);
         IBinder appThread = BundleCompat.getBinder(init, "_Black_|_client_");
         if (appThread == null || !appThread.isBinderAlive()) {
+            Slog.w(TAG, "Failed to init process: " + record.processName);
             return false;
         }
         attachClientL(record, appThread);
@@ -179,7 +234,7 @@ public class BProcessManagerService implements ISystemService {
             appThread.linkToDeath(new IBinder.DeathRecipient() {
                 @Override
                 public void binderDied() {
-                    Log.d(TAG, "App Died: " + app.processName);
+                    Slog.d(TAG, "App Died: " + app.processName);
                     appThread.unlinkToDeath(this, 0);
                     onProcessDie(app);
                 }
@@ -323,20 +378,62 @@ public class BProcessManagerService implements ISystemService {
         return -1;
     }
 
+    // ========== FIXED: Create proc directory with parent ==========
     private static void createProc(ProcessRecord record) {
-        File cmdline = new File(BEnvironment.getProcDir(record.bpid), "cmdline");
         try {
+            File procDir = BEnvironment.getProcDir(record.bpid);
+            if (!procDir.exists()) {
+                procDir.mkdirs();
+            }
+            File cmdline = new File(procDir, "cmdline");
             FileUtils.writeToFile(record.processName.getBytes(), cmdline);
-        } catch (IOException ignored) {
+            Slog.d(TAG, "Created proc: " + cmdline.getAbsolutePath());
+        } catch (IOException e) {
+            Slog.w(TAG, "Failed to create proc: " + e.getMessage());
         }
     }
 
     private static void removeProc(ProcessRecord record) {
-        FileUtils.deleteDir(BEnvironment.getProcDir(record.bpid));
+        try {
+            File procDir = BEnvironment.getProcDir(record.bpid);
+            if (procDir.exists()) {
+                FileUtils.deleteDir(procDir);
+            }
+        } catch (Throwable e) {
+            Slog.w(TAG, "Failed to remove proc: " + e.getMessage());
+        }
     }
 
     @Override
     public void systemReady() {
-        FileUtils.deleteDir(BEnvironment.getProcDir());
+        // Clean up proc directory
+        try {
+            File procDir = BEnvironment.getProcDir();
+            if (procDir.exists()) {
+                FileUtils.deleteDir(procDir);
+                procDir.mkdirs();
+            }
+        } catch (Throwable e) {
+            Slog.w(TAG, "Failed to clean proc dir: " + e.getMessage());
+        }
+        
+        // Pre-create directories for common Google services
+        String[] commonPackages = {
+            "com.google.android.gms",
+            "com.google.android.gsf",
+            "com.android.vending",
+            "com.google.android.webview",
+            "com.google.android.partnersetup",
+            "com.google.android.setupwizard",
+            "com.google.android.play.games"
+        };
+        
+        for (int userId = 0; userId <= 10; userId++) {
+            for (String pkg : commonPackages) {
+                ensureProcessDirectories(pkg, userId);
+            }
+        }
+        
+        Slog.d(TAG, "BProcessManagerService systemReady complete");
     }
 }
