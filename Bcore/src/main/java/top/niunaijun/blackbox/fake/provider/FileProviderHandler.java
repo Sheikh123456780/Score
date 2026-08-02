@@ -22,13 +22,19 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 public class FileProviderHandler {
 
     public static Uri convertFileUri(Context context, Uri uri) {
-        if (BuildCompat.isN()) {
-            File file = convertFile(context, uri);
-            if (file == null)
-                return null;
-            return BlackBoxCore.getBStorageManager().getUriForFile(file.getAbsolutePath());
-        }
+        if (uri == null)
+    return null;
+
+if (BuildCompat.isN()) {
+    File file = convertFile(context, uri);
+    if (file == null)
         return uri;
+
+    String path = BlackBoxCore.getIOCore().redirectPath(file.getAbsolutePath());
+    return BlackBoxCore.getBStorageManager().getUriForFile(path);
+}
+
+return uri;
     }
 
     public static File convertFile(Context context, Uri uri) {
@@ -39,8 +45,9 @@ public class FileProviderHandler {
                 if (fileForUri != null && fileForUri.exists()) {
                     return fileForUri;
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Throwable e) {
+    e.printStackTrace();
+}
         }
         return null;
     }
