@@ -104,7 +104,9 @@ public class IStorageManagerProxy extends BinderInvocationStub {
             try {
                 return method.invoke(who, args);
             } catch (Throwable t) {
-                return 0;
+    t.printStackTrace();
+    throw t;
+
             }
         }
     }
