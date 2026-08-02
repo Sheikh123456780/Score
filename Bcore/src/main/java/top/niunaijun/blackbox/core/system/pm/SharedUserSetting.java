@@ -94,11 +94,11 @@ public final class SharedUserSetting implements Parcelable {
     }
 
     @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeString(this.name);
-        dest.writeInt(this.userId);
-        dest.writeInt(this.seInfoTargetSdkVersion);
-    }
+    public void readFromParcel(Parcel source) {
+    this.name = source.readString();
+    this.userId = source.readInt();
+    this.seInfoTargetSdkVersion = source.readInt();
+}
 
     public void readFromParcel(Parcel source) {
         this.name = source.readString();
@@ -106,9 +106,10 @@ public final class SharedUserSetting implements Parcelable {
     }
 
     protected SharedUserSetting(Parcel in) {
-        this.name = in.readString();
-        this.userId = in.readInt();
-    }
+    this.name = in.readString();
+    this.userId = in.readInt();
+    this.seInfoTargetSdkVersion = in.readInt();
+}
 
     public static final Parcelable.Creator<SharedUserSetting> CREATOR = new Parcelable.Creator<SharedUserSetting>() {
         @Override
