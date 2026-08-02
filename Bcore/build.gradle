@@ -5,14 +5,14 @@ plugins {
 
 android {
 
-    compileSdkVersion = 34
+    compileSdkVersion = 36
     buildToolsVersion = '34'
     aidlPackagedList "android/app/IServiceConnection.aidl"
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
 
     defaultConfig {
         minSdkVersion 21
-        targetSdkVersion 34
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
         consumerProguardFiles 'consumer-rules.pro'
