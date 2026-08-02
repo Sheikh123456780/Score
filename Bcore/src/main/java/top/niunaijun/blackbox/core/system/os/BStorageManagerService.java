@@ -41,7 +41,8 @@ public class BStorageManagerService extends IBStorageManagerService.Stub impleme
             return null;
         }
         try {
-            StorageVolume[] storageVolumes = BRStorageManager.get().getVolumeList(BUserHandle.getUserId(Process.myUid()), 0);
+            StorageVolume[] storageVolumes =
+        BRStorageManager.get().getVolumeList(uid, flags);
             if (storageVolumes == null)
                 return null;
             for (StorageVolume storageVolume : storageVolumes) {
