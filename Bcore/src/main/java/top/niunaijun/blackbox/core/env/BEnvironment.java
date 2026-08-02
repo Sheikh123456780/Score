@@ -12,6 +12,7 @@ import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.utils.FileUtils;
 
+
 @Obfuscate
 public class BEnvironment {
 
@@ -186,54 +187,5 @@ public class BEnvironment {
 
     public static File getXSharedPreferences(String packageName, String prefFileName) {
         return new File(getDataDir(packageName, BActivityThread.getUserId()), "shared_prefs/" + prefFileName + ".xml");
-    }
-}
-
-
-    public static File getDataDatabasesDir(String packageName, int userId) {
-        return new File(getDataDir(packageName, userId), "databases");
-    }
-
-    public static File getAppRootDir() {
-        return getAppDir("");
-    }
-
-    public static File getAppDir(String packageName) {
-        if (packageName == null || packageName.isEmpty()) {
-            return new File(sVirtualRoot, "data/app");
-        }
-        return new File(sVirtualRoot, "data/app/" + packageName);
-    }
-
-    public static File getBaseApkDir(String packageName) {
-        return new File(sVirtualRoot, "data/app/" + packageName + "/base.apk");
-    }
-
-    public static File getAppLibDir(String packageName) {
-        return new File(getAppDir(packageName), "lib");
-    }
-
-    public static File getXSharedPreferences(String packageName, String prefFileName) {
-        return new File(BEnvironment.getDataDir(packageName, BActivityThread.getUserId()), "shared_prefs/" + prefFileName + ".xml");
-    }
-    
-    // ============================================================
-    // ADDITIONAL HELPER METHODS FOR COMPATIBILITY
-    // ============================================================
-    
-    public static File getExternalMediaDir(String packageName) {
-        File mediaDir = new File(sExternalVirtualRoot, "Android/media/" + packageName);
-        if (!mediaDir.exists()) {
-            FileUtils.mkdirs(mediaDir);
-        }
-        return mediaDir;
-    }
-    
-    public static File getExternalObbDir(String packageName) {
-        return getObbDir(packageName);
-    }
-    
-    public static String getRedirectedPath(String path) {
-        return redirectPath(path);
     }
 }
