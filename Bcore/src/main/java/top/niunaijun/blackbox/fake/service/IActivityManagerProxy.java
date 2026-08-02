@@ -105,6 +105,9 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         addMethodHook(new PkgMethodProxy("getAppStartMode"));
         addMethodHook(new PkgMethodProxy("setAppLockedVerifying"));
         addMethodHook(new PkgMethodProxy("reportJunkFromApp"));
+		addMethodHook(new PkgMethodProxy("getCurrentUser"));
+addMethodHook(new PkgMethodProxy("checkUriPermission"));
+addMethodHook(new PkgMethodProxy("grantUriPermission"));
     }
 
     @ProxyMethod("getContentProvider")
@@ -669,8 +672,11 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             MethodParameterUtils.replaceLastUid(args);
             String permission = (String) args[0];
-            if (permission.equals(Manifest.permission.ACCOUNT_MANAGER)
-                    || permission.equals(Manifest.permission.SEND_SMS)) {
+            if (Manifest.permission.ACCOUNT_MANAGER.equals(permission)
+        || Manifest.permission.SEND_SMS.equals(permission)
+        || Manifest.permission.READ_MEDIA_IMAGES.equals(permission)
+        || Manifest.permission.READ_MEDIA_VIDEO.equals(permission)
+        || Manifest.permission.READ_MEDIA_AUDIO.equals(permission)) {
                 return PackageManager.PERMISSION_GRANTED;
             }
             return method.invoke(who, args);
