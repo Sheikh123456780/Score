@@ -5,7 +5,7 @@ plugins {
 
 android {
 
-    compileSdkVersion = 36
+    compileSdkVersion = 34
     buildToolsVersion = '34'
     aidlPackagedList "android/app/IServiceConnection.aidl"
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
