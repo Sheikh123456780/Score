@@ -9,4 +9,9 @@ import top.niunaijun.blackreflection.annotation.BStaticMethod;
 public interface StorageManager {
     @BStaticMethod
     StorageVolume[] getVolumeList(int int0, int int1);
+    @BStaticMethod
+StorageVolume[] getVolumes();
+
+@BStaticMethod
+StorageVolume getPrimaryStorageVolume();
 }
