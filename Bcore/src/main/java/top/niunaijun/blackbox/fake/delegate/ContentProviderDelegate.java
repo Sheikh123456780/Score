@@ -51,6 +51,10 @@ public class ContentProviderDelegate {
             case "media":
             case "telephony":
             case "settings":
+                case "downloads":
+case "documents":
+case "externalstorage":
+case "media.documents":
                 bContentProvider = new SystemProviderStub().wrapper(iInterface, BlackBoxCore.getHostPkg());
                 break;
             default:
@@ -66,7 +70,7 @@ public class ContentProviderDelegate {
 
     public static void init() {
         clearSettingProvider();
-
+sInjected.clear();
         BlackBoxCore.getContext().getContentResolver().call(Uri.parse("content://settings"), "", null, null);
         Object activityThread = BlackBoxCore.mainThread();
         ArrayMap<Object, Object> map = (ArrayMap<Object, Object>) BRActivityThread.get(activityThread).mProviderMap();
