@@ -3,7 +3,6 @@ package top.niunaijun.blackbox.fake.service;
 import android.os.IBinder;
 
 import black.android.os.BRServiceManager;
-import black.android.os.BRISystemUpdateManagerStub; // Fixed: AutoFill manager ki jagah correct stub import kiya
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 
 /**
@@ -14,20 +13,20 @@ import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 public class ISystemUpdateProxy extends BinderInvocationStub {
 
     public ISystemUpdateProxy() {
-        super(getSystemUpdateService());
+        super(getServiceBinder());
     }
 
-    private static IBinder getSystemUpdateService() {
+    private static IBinder getServiceBinder() {
         return BRServiceManager.get().getService("system_update");
     }
 
     @Override
     protected Object getWho() {
-        IBinder binder = getSystemUpdateService();
+        IBinder binder = getServiceBinder();
         if (binder == null) {
             return null;
         }
-        return BRISystemUpdateManagerStub.get().asInterface(binder);
+        return binder;
     }
 
     @Override
