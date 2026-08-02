@@ -79,8 +79,9 @@ public class IStorageManagerProxy extends BinderInvocationStub {
                 if (volumeList != null && volumeList.length > 0) {
                     return volumeList;
                 }
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable e) {
+    e.printStackTrace();
+}
 
             // Real host system fallback for direct Android 16 resource verification
             return method.invoke(who, args);
