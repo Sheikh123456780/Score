@@ -26,7 +26,7 @@ import java.util.Map;
 
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.utils.FileUtils;
-
+import java.io.File;
 /**
  * Settings data for a particular shared user ID we know about.
  */
@@ -117,11 +117,12 @@ public final class SharedUserSetting implements Parcelable {
         return 0;
     }
 
-    @Override
-    public void readFromParcel(Parcel source) {
-    this.name = source.readString();
-    this.userId = source.readInt();
-    this.seInfoTargetSdkVersion = source.readInt();
+    
+
+public void writeToParcel(Parcel dest, int flags) {
+    dest.writeString(name);
+    dest.writeInt(userId);
+    dest.writeInt(seInfoTargetSdkVersion);
 }
 
     
