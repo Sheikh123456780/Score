@@ -29,12 +29,12 @@ public class ISystemUpdateProxy extends BinderInvocationStub {
         return binder;
     }
 
-    @Override
-    protected void inject(Object baseInvocation, Object proxyInvocation) {
-        if (getWho() != null) {
-            replaceSystemService("system_update");
-        }
+@Override
+protected void inject(Object baseInvocation, Object proxyInvocation) {
+    if (getWho() != null) {
+        replaceSystemService("system_update");
     }
+}
 
     @Override
     public boolean isBadEnv() {
