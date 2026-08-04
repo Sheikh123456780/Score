@@ -118,13 +118,18 @@ public final class SharedUserSetting implements Parcelable {
     }
 
     
-
-public void writeToParcel(Parcel dest, int flags) {
-    dest.writeString(name);
-    dest.writeInt(userId);
-    dest.writeInt(seInfoTargetSdkVersion);
+public void readFromParcel(Parcel source) {
+    this.name = source.readString();
+    this.userId = source.readInt();
+    this.seInfoTargetSdkVersion = source.readInt();
 }
-
+    
+@Override
+public void writeToParcel(Parcel dest, int flags) {
+    dest.writeString(this.name);
+    dest.writeInt(this.userId);
+    dest.writeInt(this.seInfoTargetSdkVersion);
+}
     
 
     protected SharedUserSetting(Parcel in) {
