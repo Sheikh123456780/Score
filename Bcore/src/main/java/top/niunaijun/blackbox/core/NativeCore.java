@@ -75,6 +75,8 @@ public class NativeCore {
 
         try {
             init(apiLevel);
+            disableHiddenApi();
+enableIO();
             Log.d(TAG, "HASAD init completed");
             
             if (BuildCompat.isAndroid16()) {
