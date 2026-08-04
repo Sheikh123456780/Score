@@ -121,8 +121,8 @@ path = BEnvironment.redirectPath(path);
         File external = BEnvironment.getExternalUserDir(BActivityThread.getUserId());
         rule.put("/storage/emulated/0", external.getAbsolutePath());
 rule.put("/storage/self/primary", external.getAbsolutePath());
-rule.put("/mnt/sdcard", external.getAbsolutePath());
 rule.put("/sdcard", external.getAbsolutePath());
+rule.put("/mnt/sdcard", external.getAbsolutePath());
         // sdcard
         File sdcardAndroidFile = new File("/sdcard/Android");
         String androidDir = String.format("/storage/emulated/%d/Android", systemUserId);
