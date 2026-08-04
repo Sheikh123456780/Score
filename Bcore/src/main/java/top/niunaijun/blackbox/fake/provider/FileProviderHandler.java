@@ -30,7 +30,8 @@ if (BuildCompat.isN()) {
     if (file == null)
         return uri;
 
-    String path = BlackBoxCore.getIOCore().redirectPath(file.getAbsolutePath());
+    String path = top.niunaijun.blackbox.core.IOCore.get()
+        .redirectPath(file.getAbsolutePath());
     return BlackBoxCore.getBStorageManager().getUriForFile(path);
 }
 
