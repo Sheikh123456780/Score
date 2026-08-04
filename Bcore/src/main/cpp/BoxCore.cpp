@@ -108,16 +108,18 @@ void addIORule(JNIEnv *env, jclass clazz, jstring target_path,jstring relocate_p
 
 void enableIO(JNIEnv *env, jclass clazz) {
     ALOGD("set enableIO");
-    IO::init(env);
-    nativeHook(env);
+IO::init(env);
+nativeHook(env);
+
+ALOGD("Android %d IO initialized", VMEnv.api_level);
 }
 
 bool disableHiddenApi(JNIEnv *env, jclass clazz) {
     ALOGD("set disableHiddenApi");
-    if(!disable_hidden_api(env)){
-        ALOGD("set disableHiddenApi Fail!!!");
-        return false;
-    }
+    if (!disable_hidden_api(env)) {
+    ALOGE("disable_hidden_api failed");
+    return false;
+}
     return true;
 }
 
@@ -444,3 +446,4 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     registerMethod(env);
     return JNI_VERSION_1_6;
 }
+
