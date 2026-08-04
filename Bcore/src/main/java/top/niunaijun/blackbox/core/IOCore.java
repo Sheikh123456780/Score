@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import top.niunaijun.blackbox.BlackBoxCore;
-
+import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.utils.FileUtils;
 import top.niunaijun.blackbox.utils.TrieTree;
@@ -110,8 +110,7 @@ public class IOCore {
         String packageName = context.getPackageName();
 
         try {
-            int userId = BClient.getClient() != null ? BClient.getClient().getUserId() : BlackBoxCore.getHostUserId();
-            ApplicationInfo packageInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, PackageManager.GET_META_DATA, userId);
+            ApplicationInfo packageInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, PackageManager.GET_META_DATA, BActivityThread.getUserId());
             int systemUserId = BlackBoxCore.getHostUserId();
             rule.put(String.format("/data/data/%s/lib", packageName), packageInfo.nativeLibraryDir);
             rule.put(String.format("/data/user/%d/%s/lib", systemUserId, packageName), packageInfo.nativeLibraryDir);
@@ -125,15 +124,15 @@ public class IOCore {
             
             rule.put("/data/misc/profiles", profilesRoot.getAbsolutePath());
 
-            File profilesCurDir = new File(profilesRoot, String.format("cur/%d/%s", userId, packageName));
-            File profilesRefDir = new File(profilesRoot, String.format("ref/%d/%s", userId, packageName));
+            File profilesCurDir = new File(profilesRoot, String.format("cur/%d/%s", BActivityThread.getUserId(), packageName));
+            File profilesRefDir = new File(profilesRoot, String.format("ref/%d/%s", BActivityThread.getUserId(), packageName));
             FileUtils.mkdirs(profilesCurDir.getAbsolutePath());
             FileUtils.mkdirs(profilesRefDir.getAbsolutePath());
-            rule.put(String.format("/data/misc/profiles/cur/%d/%s", userId, packageName), profilesCurDir.getAbsolutePath());
-            rule.put(String.format("/data/misc/profiles/ref/%d/%s", userId, packageName), profilesRefDir.getAbsolutePath());
+            rule.put(String.format("/data/misc/profiles/cur/%d/%s", BActivityThread.getUserId(), packageName), profilesCurDir.getAbsolutePath());
+            rule.put(String.format("/data/misc/profiles/ref/%d/%s", BActivityThread.getUserId(), packageName), profilesRefDir.getAbsolutePath());
 
             if (BlackBoxCore.getContext().getExternalCacheDir() != null && context.getExternalCacheDir() != null) {
-                File external = BEnvironment.getExternalUserDir(userId);
+                File external = BEnvironment.getExternalUserDir(BActivityThread.getUserId());
 
                 
                 rule.put("/sdcard", external.getAbsolutePath());
@@ -158,7 +157,6 @@ public class IOCore {
         NativeCore.enableIO();
     }
 
-
     private void hideRoot(Map<String, String> rule) {
         rule.put("/system/app/Superuser.apk", "/system/app/Superuser.apk-fake");
         rule.put("/sbin/su", "/sbin/su-fake");
@@ -173,7 +171,7 @@ public class IOCore {
     }
 
     private void proc(Map<String, String> rule) {
-        int appPid = BlackBoxCore.getAppPid();
+        int appPid = BActivityThread.getAppPid();
         int pid = Process.myPid();
         String selfProc = "/proc/self/";
         String proc = "/proc/" + pid + "/";
