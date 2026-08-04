@@ -54,14 +54,9 @@ public class IOCore {
 
   public String redirectPath(String path) {
     if (TextUtils.isEmpty(path)) return path;
-    if (path == null)
-    return null;
-
-if (path.contains("/blackbox/"))
-    return path;
-
-path = BEnvironment.redirectPath(path);
-    
+    if (path.contains("/blackbox/")) {
+      return path;
+    }
 
     // Search the key from TrieTree
     String key = mTrieTree.search(path);
@@ -119,10 +114,6 @@ path = BEnvironment.redirectPath(path);
       if (BlackBoxCore.getContext().getExternalCacheDir() != null
           && context.getExternalCacheDir() != null) {
         File external = BEnvironment.getExternalUserDir(BActivityThread.getUserId());
-        rule.put("/storage/emulated/0", external.getAbsolutePath());
-rule.put("/storage/self/primary", external.getAbsolutePath());
-rule.put("/sdcard", external.getAbsolutePath());
-rule.put("/mnt/sdcard", external.getAbsolutePath());
         // sdcard
         File sdcardAndroidFile = new File("/sdcard/Android");
         String androidDir = String.format("/storage/emulated/%d/Android", systemUserId);
