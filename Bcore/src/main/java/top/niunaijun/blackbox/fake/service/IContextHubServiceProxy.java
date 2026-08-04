@@ -39,11 +39,14 @@ public class IContextHubServiceProxy extends BinderInvocationStub {
     }
 
     @Override
-    protected void inject(Object baseInvocation, Object proxyInvocation) {
-        if (getWho() != null) {
-            replaceSystemService(getServiceName());
-        }
+protected void inject(Object baseInvocation, Object proxyInvocation) {
+    // Only attempt to replace the system service if the base interface is non-null
+    if (getWho() != null) {
+        replaceSystemService(getServiceName());
+    } else {
+        // Log gracefully or skip injection instead of throwing
     }
+}
 
     @Override
     protected void onBindMethod() {
