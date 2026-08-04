@@ -110,7 +110,8 @@ public class IOCore {
         String packageName = context.getPackageName();
 
         try {
-            ApplicationInfo packageInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, PackageManager.GET_META_DATA, BlackBoxCore.getUserId());
+            int userId = BClient.getClient() != null ? BClient.getClient().getUserId() : BlackBoxCore.getHostUserId();
+            ApplicationInfo packageInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, PackageManager.GET_META_DATA, userId);
             int systemUserId = BlackBoxCore.getHostUserId();
             rule.put(String.format("/data/data/%s/lib", packageName), packageInfo.nativeLibraryDir);
             rule.put(String.format("/data/user/%d/%s/lib", systemUserId, packageName), packageInfo.nativeLibraryDir);
@@ -124,15 +125,15 @@ public class IOCore {
             
             rule.put("/data/misc/profiles", profilesRoot.getAbsolutePath());
 
-            File profilesCurDir = new File(profilesRoot, String.format("cur/%d/%s", BlackBoxCore.getUserId(), packageName));
-            File profilesRefDir = new File(profilesRoot, String.format("ref/%d/%s", BlackBoxCore.getUserId(), packageName));
+            File profilesCurDir = new File(profilesRoot, String.format("cur/%d/%s", userId, packageName));
+            File profilesRefDir = new File(profilesRoot, String.format("ref/%d/%s", userId, packageName));
             FileUtils.mkdirs(profilesCurDir.getAbsolutePath());
             FileUtils.mkdirs(profilesRefDir.getAbsolutePath());
-            rule.put(String.format("/data/misc/profiles/cur/%d/%s", BlackBoxCore.getUserId(), packageName), profilesCurDir.getAbsolutePath());
-            rule.put(String.format("/data/misc/profiles/ref/%d/%s", BlackBoxCore.getUserId(), packageName), profilesRefDir.getAbsolutePath());
+            rule.put(String.format("/data/misc/profiles/cur/%d/%s", userId, packageName), profilesCurDir.getAbsolutePath());
+            rule.put(String.format("/data/misc/profiles/ref/%d/%s", userId, packageName), profilesRefDir.getAbsolutePath());
 
             if (BlackBoxCore.getContext().getExternalCacheDir() != null && context.getExternalCacheDir() != null) {
-                File external = BEnvironment.getExternalUserDir(BlackBoxCore.getUserId());
+                File external = BEnvironment.getExternalUserDir(userId);
 
                 
                 rule.put("/sdcard", external.getAbsolutePath());
@@ -156,6 +157,7 @@ public class IOCore {
         }
         NativeCore.enableIO();
     }
+
 
     private void hideRoot(Map<String, String> rule) {
         rule.put("/system/app/Superuser.apk", "/system/app/Superuser.apk-fake");
