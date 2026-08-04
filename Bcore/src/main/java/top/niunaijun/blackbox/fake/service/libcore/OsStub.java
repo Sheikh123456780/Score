@@ -48,19 +48,10 @@ public class OsStub extends ClassInvocationStub {
             for (int i = 0; i < args.length; i++) {
                 if (args[i] == null)
                     continue;
-                if (args[i] instanceof String) {
-    String path = (String) args[i];
-
-    if (path.startsWith("/proc/")
-            || path.startsWith("/sys/")
-            || path.startsWith("/dev/")) {
-        continue;
-    }
-
-    if (path.startsWith("/")) {
-        args[i] = IOCore.get().redirectPath(path);
-    }
-}
+                if (args[i] instanceof String && ((String) args[i]).startsWith("/")) {
+                    String orig = (String) args[i];
+                    args[i] = IOCore.get().redirectPath(orig);
+                }
             }
         }
         return super.invoke(proxy, method, args);
@@ -110,25 +101,6 @@ public class OsStub extends ClassInvocationStub {
         }
     }
 
-    @ProxyMethod("fstat")
-public static class fstat extends MethodHook {
-    @Override
-    protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-        Object result;
-        try {
-            result = method.invoke(who, args);
-        } catch (Throwable e) {
-            throw e.getCause() != null ? e.getCause() : e;
-        }
-
-        if (result != null) {
-            Reflector.with(result).field("st_uid").set(getFakeUid(-1));
-        }
-
-        return result;
-    }
-}
-
     // 🔥 Added access hook to bypass native Android 16 file locks
     @ProxyMethod("access")
     public static class access extends MethodHook {
@@ -137,28 +109,11 @@ public static class fstat extends MethodHook {
             try {
                 return method.invoke(who, args);
             } catch (Throwable e) {
-    if (e.getCause() != null)
-        throw e.getCause();
-    throw e;
-}
+                return true; // Force-grant permission for game file verification
+            }
         }
     }
 
-    @ProxyMethod("open")
-public static class open extends MethodHook {
-    @Override
-    protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-        if (args != null && args.length > 0 && args[0] instanceof String) {
-            args[0] = IOCore.get().redirectPath((String) args[0]);
-        }
-
-        try {
-            return method.invoke(who, args);
-        } catch (Throwable e) {
-            throw e.getCause() != null ? e.getCause() : e;
-        }
-    }
-}
     private static int getFakeUid(int callUid) {
         if (callUid > 0 && callUid <= Process.FIRST_APPLICATION_UID)
             return callUid;
