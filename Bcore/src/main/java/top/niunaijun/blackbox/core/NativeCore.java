@@ -75,8 +75,6 @@ public class NativeCore {
 
         try {
             init(apiLevel);
-            disableHiddenApi();
-enableIO();
             Log.d(TAG, "HASAD init completed");
             
             if (BuildCompat.isAndroid16()) {
@@ -123,32 +121,12 @@ enableIO();
     }
 
     @Keep
-public static String redirectPath(String path) {
-    if (path == null)
-        return null;
-
-    if (path.startsWith("/proc/")
-            || path.startsWith("/sys/")
-            || path.startsWith("/dev/")) {
-        return path;
+    public static String redirectPath(String path) {
+        return IOCore.get().redirectPath(path);
     }
-
-    return IOCore.get().redirectPath(path);
-}
 
     @Keep
-public static File redirectPath(File path) {
-    if (path == null)
-        return null;
-
-    String p = path.getAbsolutePath();
-
-    if (p.startsWith("/proc/")
-            || p.startsWith("/sys/")
-            || p.startsWith("/dev/")) {
-        return path;
+    public static File redirectPath(File path) {
+        return IOCore.get().redirectPath(path);
     }
-
-    return IOCore.get().redirectPath(path);
-}
 }
