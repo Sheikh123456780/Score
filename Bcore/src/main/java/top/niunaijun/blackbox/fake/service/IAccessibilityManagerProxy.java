@@ -14,7 +14,7 @@ import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethods;
 
 /**
- * Created by Milk on 4/25/21.
+ * Created by @RIYAZXERO on 4/25/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -42,9 +42,7 @@ public class IAccessibilityManagerProxy extends BinderInvocationStub {
         return false;
     }
 
-    @ProxyMethods({"interrupt", "sendAccessibilityEvent", "addClient",
-            "getInstalledAccessibilityServiceList", "getEnabledAccessibilityServiceList",
-            "addAccessibilityInteractionConnection", "getWindowToken"})
+    @ProxyMethods({"interrupt", "sendAccessibilityEvent", "addClient","getInstalledAccessibilityServiceList", "getEnabledAccessibilityServiceList","addAccessibilityInteractionConnection", "getWindowToken"})
     public static class ReplaceUserId extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {

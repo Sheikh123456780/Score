@@ -1,8 +1,8 @@
 package top.niunaijun.blackbox.fake.service;
 
-import android.os.IBinder;
 
 import black.android.os.BRServiceManager;
+import black.android.view.BRIAutoFillManagerStub;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 
 /**
@@ -11,30 +11,19 @@ import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
  * @date :2022/4/2 21:59
  **/
 public class ISystemUpdateProxy extends BinderInvocationStub {
-
     public ISystemUpdateProxy() {
-        super(getServiceBinder());
-    }
-
-    private static IBinder getServiceBinder() {
-        return BRServiceManager.get().getService("system_update");
+        super(BRServiceManager.get().getService("system_update"));
     }
 
     @Override
     protected Object getWho() {
-        IBinder binder = getServiceBinder();
-        if (binder == null) {
-            return null;
-        }
-        return binder;
+        return BRIAutoFillManagerStub.get().asInterface(BRServiceManager.get().getService("system_update"));
     }
 
-@Override
-protected void inject(Object baseInvocation, Object proxyInvocation) {
-    if (getWho() != null) {
+    @Override
+    protected void inject(Object baseInvocation, Object proxyInvocation) {
         replaceSystemService("system_update");
     }
-}
 
     @Override
     public boolean isBadEnv() {

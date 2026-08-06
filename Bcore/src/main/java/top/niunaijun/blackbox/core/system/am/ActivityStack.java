@@ -18,11 +18,13 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,14 +39,15 @@ import top.niunaijun.blackbox.core.system.pm.PackageManagerCompat;
 import top.niunaijun.blackbox.proxy.ProxyActivity;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
 import top.niunaijun.blackbox.proxy.record.ProxyActivityRecord;
+import top.niunaijun.blackbox.utils.ArrayUtils;
 import top.niunaijun.blackbox.utils.ComponentUtils;
 import top.niunaijun.blackbox.utils.Slog;
-import top.niunaijun.blackbox.utils.compat.ActivityManagerCompat;
 
 import static android.content.pm.PackageManager.GET_ACTIVITIES;
+import top.niunaijun.blackbox.utils.compat.ActivityManagerCompat;
 
 /**
- * Created by Milk on 4/5/21.
+ * Created by @RIYAZXERO on 4/5/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -149,19 +152,12 @@ public class ActivityStack {
         }
         // 移至前台
         mAms.moveTaskToFront(taskRecord.id, 0);
-
         boolean notStartToFront = false;
         if (clearTop || singleTop || clearTask) {
             notStartToFront = true;
         }
-
-        boolean startTaskToFront = !notStartToFront
-                && ComponentUtils.intentFilterEquals(taskRecord.rootIntent, intent)
-                && taskRecord.rootIntent.getFlags() == intent.getFlags();
-
-        if (startTaskToFront)
-            return 0;
-
+        boolean startTaskToFront = !notStartToFront && ComponentUtils.intentFilterEquals(taskRecord.rootIntent, intent) && taskRecord.rootIntent.getFlags() == intent.getFlags();
+        if (startTaskToFront) return 0;
         ActivityRecord topActivityRecord = taskRecord.getTopActivityRecord();
         ActivityRecord targetActivityRecord = findActivityRecordByComponentName(userId, ComponentUtils.toComponentName(activityInfo));
         ActivityRecord newIntentRecord = null;
@@ -260,8 +256,7 @@ public class ActivityStack {
                 resultTo = top.token;
             }
         }
-        return startActivityInSourceTask(intent,
-                resolvedType, resultTo, resultWho, requestCode, flags, options, userId, topActivityRecord, activityInfo, launchModeFlags);
+        return startActivityInSourceTask(intent,resolvedType, resultTo, resultWho, requestCode, flags, options, userId, topActivityRecord, activityInfo, launchModeFlags);
     }
 
     private void deliverNewIntentLocked(ActivityRecord activityRecord, Intent intent) {
@@ -272,34 +267,42 @@ public class ActivityStack {
         }
     }
 
-    private Intent startActivityProcess(int userId, Intent intent, ActivityInfo
-            info, ActivityRecord record) {
-        ProxyActivityRecord stubRecord = new ProxyActivityRecord(userId, info, intent, record);
-        ProcessRecord targetApp = BProcessManagerService.get().startProcessLocked(info.packageName, info.processName, userId, -1, Binder.getCallingPid());
-        if (targetApp == null) {
-            throw new RuntimeException("Unable to create process, name:" + info.name);
-        }
-        return getStartStubActivityIntentInner(intent, targetApp.bpid, userId, stubRecord, info);
-    }
+    private Intent startActivityProcess(int userId, Intent intent, ActivityInfo info, ActivityRecord record) {
+		ProxyActivityRecord stubRecord = new ProxyActivityRecord(userId, info, intent, record);
+		String processName = info.processName;
+		if (processName == null || processName.contains(":") || !processName.equals(info.packageName)) {
+			processName = info.packageName;
+		}
+		Log.e(TAG,"StartProcess pkg=" + info.packageName + " activity=" + info.name + " process=" + processName);
+		ProcessRecord targetApp = BProcessManagerService.get().startProcessLocked(info.packageName,processName,userId,-1,Binder.getCallingPid());
+		if (targetApp == null) {
+			Log.e(TAG, "Process creation failed for " + processName + ", using default process");
+			return getStartStubActivityIntentInner(intent, 0, userId, stubRecord, info);
+		}
+		return getStartStubActivityIntentInner(intent,targetApp.bpid,userId,stubRecord,info);
+	}
 
-    private int startActivityInNewTaskLocked(int userId, Intent intent, ActivityInfo
-            activityInfo, IBinder resultTo, int launchMode) {
-        ActivityRecord record = newActivityRecord(intent, activityInfo, resultTo, userId);
-        Intent shadow = startActivityProcess(userId, intent, activityInfo, record);
+    private int startActivityInNewTaskLocked(int userId, Intent intent, ActivityInfo activityInfo, IBinder resultTo, int launchMode) {
+		ActivityRecord record = newActivityRecord(intent, activityInfo, resultTo, userId);
+		Intent shadow = startActivityProcess(userId, intent, activityInfo, record);
+		if (shadow == null) {
+			Log.e(TAG, "Shadow intent is null, cannot start activity");
+			return -1;
+		}
+		shadow.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+		shadow.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
+		shadow.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		shadow.addFlags(launchMode);
+		try {
+			BlackBoxCore.getContext().startActivity(shadow);
+			return 0;
+		} catch (Exception e) {
+			Log.e(TAG, "Failed to start activity: " + e.getMessage());
+			return -1;
+		}
+	}
 
-        shadow.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
-        shadow.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
-        shadow.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        shadow.addFlags(launchMode);
-
-        BlackBoxCore.getContext().startActivity(shadow);
-        return 0;
-    }
-
-    private int startActivityInSourceTask(Intent intent, String resolvedType,
-                                          IBinder resultTo, String resultWho, int requestCode, int flags,
-                                          Bundle options,
-                                          int userId, ActivityRecord sourceRecord, ActivityInfo activityInfo, int launchMode) {
+    private int startActivityInSourceTask(Intent intent, String resolvedType,IBinder resultTo, String resultWho, int requestCode, int flags,Bundle options,int userId, ActivityRecord sourceRecord, ActivityInfo activityInfo, int launchMode) {
         ActivityRecord selfRecord = newActivityRecord(intent, activityInfo, resultTo, userId);
         Intent shadow = startActivityProcess(userId, intent, activityInfo, selfRecord);
         shadow.setAction(UUID.randomUUID().toString());
@@ -310,16 +313,12 @@ public class ActivityStack {
         return realStartActivityLocked(sourceRecord.processRecord.appThread, shadow, resolvedType, resultTo, resultWho, requestCode, flags, options);
     }
 
-    private int realStartActivityLocked(IInterface appThread, Intent intent, String resolvedType,
-                                        IBinder resultTo, String resultWho, int requestCode, int flags,
-                                        Bundle options) {
+    private int realStartActivityLocked(IInterface appThread, Intent intent, String resolvedType,IBinder resultTo, String resultWho, int requestCode, int flags,Bundle options) {
         try {
             flags &= ~ActivityManagerCompat.START_FLAG_DEBUG;
             flags &= ~ActivityManagerCompat.START_FLAG_NATIVE_DEBUGGING;
             flags &= ~ActivityManagerCompat.START_FLAG_TRACK_ALLOCATION;
-
-            BRIActivityManager.get(BRActivityManagerNative.get().getDefault()).startActivity(appThread, BlackBoxCore.getHostPkg(), intent,
-                    resolvedType, resultTo, resultWho, requestCode, flags, null, options);
+            BRIActivityManager.get(BRActivityManagerNative.get().getDefault()).startActivity(appThread, BlackBoxCore.getHostPkg(), intent,resolvedType, resultTo, resultWho, requestCode, flags, null, options);
         } catch (Throwable e) {
             e.printStackTrace();
         }
@@ -336,9 +335,7 @@ public class ActivityStack {
         return tasks.get(tasks.size() - 1).getTopActivityRecord();
     }
 
-    private Intent getStartStubActivityIntentInner(Intent intent, int vpid,
-                                                   int userId, ProxyActivityRecord target,
-                                                   ActivityInfo activityInfo) {
+    private Intent getStartStubActivityIntentInner(Intent intent, int vpid,int userId, ProxyActivityRecord target,ActivityInfo activityInfo) {
         Intent shadow = new Intent();
         TypedArray typedArray = null;
         try {
@@ -385,8 +382,7 @@ public class ActivityStack {
         }
     }
 
-    ActivityRecord newActivityRecord(Intent intent, ActivityInfo info, IBinder resultTo,
-                                     int userId) {
+    ActivityRecord newActivityRecord(Intent intent, ActivityInfo info, IBinder resultTo,int userId) {
         ActivityRecord targetRecord = ActivityRecord.create(intent, info, resultTo, userId);
         synchronized (mLaunchingActivities) {
             mLaunchingActivities.add(targetRecord);
@@ -396,8 +392,7 @@ public class ActivityStack {
         return targetRecord;
     }
 
-    private ActivityRecord findActivityRecordByComponentName(int userId, ComponentName
-            componentName) {
+    private ActivityRecord findActivityRecordByComponentName(int userId, ComponentName componentName) {
         ActivityRecord record = null;
         for (TaskRecord next : mTasks.values()) {
             if (userId == next.userId) {
@@ -454,8 +449,7 @@ public class ActivityStack {
         }
     }
 
-    public void onActivityCreated(ProcessRecord processRecord, int taskId, IBinder
-            token, ActivityRecord record) {
+    public void onActivityCreated(ProcessRecord processRecord, int taskId, IBinder token, ActivityRecord record) {
         synchronized (mLaunchingActivities) {
             mLaunchingActivities.remove(record);
             mHandler.removeMessages(LAUNCH_TIME_OUT, record);

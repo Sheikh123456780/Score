@@ -8,45 +8,55 @@ import android.os.Build.VERSION;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.util.Log;
 
 public class ContentProviderCompat {
+    private static final String TAG = "ContentProviderCompat";
 
-    public static Bundle call(Context context, Uri uri, String method, String arg, Bundle extras, int retryCount) throws IllegalAccessException {
-        if (VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
+    public static Bundle call(Context context, String authority, String method, String arg, Bundle extras) {
+        try {
+            Uri uri = Uri.parse("content://" + authority);
             return context.getContentResolver().call(uri, method, arg, extras);
+        } catch (Exception e) {
+            Log.e(TAG, "Provider call failed: " + authority + ", error: " + e.getMessage());
+            return null;
         }
+    }
+
+    public static Bundle call(Context context, Uri uri, String method, String arg, Bundle extras, int retryCount) {
         ContentProviderClient client = acquireContentProviderClientRetry(context, uri, retryCount);
         try {
             if (client == null) {
-                throw new IllegalAccessException();
+                Log.e(TAG, "Client is null for URI: " + uri);
+                return null;
             }
             return client.call(method, arg, extras);
         } catch (RemoteException e) {
-            throw new IllegalAccessException(e.getMessage());
+            Log.e(TAG, "RemoteException: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "Error: " + e.getMessage());
+            return null;
         } finally {
             releaseQuietly(client);
         }
     }
 
-
     private static ContentProviderClient acquireContentProviderClient(Context context, Uri uri) {
         try {
-            if (VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                return context.getContentResolver().acquireUnstableContentProviderClient(uri);
-            }
-            return context.getContentResolver().acquireContentProviderClient(uri);
+            return context.getContentResolver().acquireUnstableContentProviderClient(uri);
         } catch (SecurityException e) {
-            e.printStackTrace();
+            Log.e(TAG, "SecurityException for URI: " + uri);
+            return null;
         }
-        return null;
     }
 
     public static ContentProviderClient acquireContentProviderClientRetry(Context context, Uri uri, int retryCount) {
         ContentProviderClient client = acquireContentProviderClient(context, uri);
-        if (client == null) {
+        if (client == null && retryCount > 0) {
             int retry = 0;
             while (retry < retryCount && client == null) {
-                SystemClock.sleep(400);
+                SystemClock.sleep(400L);
                 retry++;
                 client = acquireContentProviderClient(context, uri);
             }
@@ -56,24 +66,26 @@ public class ContentProviderCompat {
 
     public static ContentProviderClient acquireContentProviderClientRetry(Context context, String name, int retryCount) {
         ContentProviderClient client = acquireContentProviderClient(context, name);
-        if (client == null) {
+        if (client == null && retryCount > 0) {
             int retry = 0;
             while (retry < retryCount && client == null) {
-                SystemClock.sleep(400);
+                SystemClock.sleep(400L);
                 retry++;
                 client = acquireContentProviderClient(context, name);
             }
         }
         return client;
     }
-
+    
     private static ContentProviderClient acquireContentProviderClient(Context context, String name) {
-        if (VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+        try {
             return context.getContentResolver().acquireUnstableContentProviderClient(name);
+        } catch (Exception e) {
+            Log.e(TAG, "Acquire failed for: " + name);
+            return null;
         }
-        return context.getContentResolver().acquireContentProviderClient(name);
     }
-
+    
     private static void releaseQuietly(ContentProviderClient client) {
         if (client != null) {
             try {
@@ -82,7 +94,8 @@ public class ContentProviderCompat {
                 } else {
                     client.release();
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Ignore
             }
         }
     }

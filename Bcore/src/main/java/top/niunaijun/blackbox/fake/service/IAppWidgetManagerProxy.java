@@ -11,7 +11,7 @@ import top.niunaijun.blackbox.fake.service.base.ValueMethodProxy;
 import top.niunaijun.blackbox.utils.MethodParameterUtils;
 
 /**
- * Created by Milk on 4/5/21.
+ * Created by @RIYAZXERO on 4/5/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -54,17 +54,17 @@ public class IAppWidgetManagerProxy extends BinderInvocationStub {
         addMethodHook(new ValueMethodProxy("deleteAppWidgetId", 0));
         addMethodHook(new ValueMethodProxy("deleteHost", 0));
         addMethodHook(new ValueMethodProxy("deleteAllHosts", 0));
-        addMethodHook(new ValueMethodProxy("getAppWidgetViews", null));
-        addMethodHook(new ValueMethodProxy("getAppWidgetIdsForHost", null));
-        addMethodHook(new ValueMethodProxy("createAppWidgetConfigIntentSender", null));
+        addMethodHook(new ValueMethodProxy("getAppWidgetViews", (Object) null));
+        addMethodHook(new ValueMethodProxy("getAppWidgetIdsForHost", (Object) null));
+        addMethodHook(new ValueMethodProxy("createAppWidgetConfigIntentSender", (Object) null));
         addMethodHook(new ValueMethodProxy("updateAppWidgetIds", 0));
         addMethodHook(new ValueMethodProxy("updateAppWidgetOptions", 0));
-        addMethodHook(new ValueMethodProxy("getAppWidgetOptions", null));
+        addMethodHook(new ValueMethodProxy("getAppWidgetOptions", (Object) null));
         addMethodHook(new ValueMethodProxy("partiallyUpdateAppWidgetIds", 0));
         addMethodHook(new ValueMethodProxy("updateAppWidgetProvider", 0));
         addMethodHook(new ValueMethodProxy("notifyAppWidgetViewDataChanged", 0));
-        addMethodHook(new ValueMethodProxy("getInstalledProvidersForProfile", null));
-        addMethodHook(new ValueMethodProxy("getAppWidgetInfo", null));
+        addMethodHook(new ValueMethodProxy("getInstalledProvidersForProfile", (Object) null));
+        addMethodHook(new ValueMethodProxy("getAppWidgetInfo", (Object) null));
         addMethodHook(new ValueMethodProxy("hasBindAppWidgetPermission", false));
         addMethodHook(new ValueMethodProxy("setBindAppWidgetPermission", 0));
         addMethodHook(new ValueMethodProxy("bindAppWidgetId", false));

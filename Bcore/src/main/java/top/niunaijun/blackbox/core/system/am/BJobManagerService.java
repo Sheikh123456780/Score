@@ -21,9 +21,10 @@ import top.niunaijun.blackbox.core.system.ProcessRecord;
 import top.niunaijun.blackbox.core.system.pm.BPackageManagerService;
 import top.niunaijun.blackbox.entity.JobRecord;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
+import top.niunaijun.blackbox.utils.FileUtils;
 
 /**
- * Created by Milk on 4/2/21.
+ * Created by @RIYAZXERO on 4/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -45,7 +46,7 @@ public class BJobManagerService extends IBJobManagerService.Stub implements ISys
         ComponentName componentName = info.getService();
         Intent intent = new Intent();
         intent.setComponent(componentName);
-        ResolveInfo resolveInfo = BPackageManagerService.get().resolveService(intent, PackageManager.GET_META_DATA, null, userId);
+        ResolveInfo resolveInfo = BPackageManagerService.get().resolveService(intent, FileUtils.FileMode.MODE_IWUSR, null, userId);
         if (resolveInfo == null) {
             return info;
         }

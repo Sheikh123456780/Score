@@ -27,12 +27,14 @@ import top.niunaijun.blackbox.entity.UnbindRecord;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
 import top.niunaijun.blackbox.proxy.record.ProxyServiceRecord;
-import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
- * Created by Milk on 4/7/21.
- * Android 16 compatible ActiveServices
- * Updated for new ServiceConnection API
+ * Created by @RIYAZXERO on 4/7/21.
+ * * ∧＿∧
+ * (`･ω･∥
+ * 丶　つ０
+ * しーＪ
+ * 此处无Bug
  */
 @SuppressLint("NewApi")
 public class ActiveServices {
@@ -41,21 +43,14 @@ public class ActiveServices {
     private final Map<Intent.FilterComparison, RunningServiceRecord> mRunningServiceRecords = new HashMap<>();
     private final Map<IBinder, RunningServiceRecord> mRunningTokens = new HashMap<>();
     private final Map<IBinder, ConnectedServiceRecord> mConnectedServices = new HashMap<>();
-    
-    // Android 16+ session tracking
-    private final Map<IBinder, Object> mServiceSessions = new HashMap<>();
 
     public void startService(Intent intent, String resolvedType, boolean requireForeground, int userId) {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return;
+//            throw new RuntimeException("resolveService service exception");
         ServiceInfo serviceInfo = resolveInfo.serviceInfo;
-        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(
-                serviceInfo.packageName, 
-                serviceInfo.processName, 
-                userId, 
-                -1, 
-                Binder.getCallingPid());
+        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(serviceInfo.packageName, serviceInfo.processName, userId, -1, Binder.getCallingPid());
         if (processRecord == null) {
             throw new RuntimeException("Unable to create " + serviceInfo.name);
         }
@@ -77,6 +72,7 @@ public class ActiveServices {
     }
 
     public int stopService(Intent intent, String resolvedType, int userId) {
+//        ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         synchronized (mRunningServiceRecords) {
             RunningServiceRecord runningServiceRecord = findRunningServiceRecord(intent);
             if (runningServiceRecord == null) {
@@ -91,12 +87,7 @@ public class ActiveServices {
             if (resolveInfo == null)
                 return 0;
             ServiceInfo serviceInfo = resolveInfo.serviceInfo;
-            ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(
-                    serviceInfo.packageName, 
-                    serviceInfo.processName, 
-                    userId, 
-                    -1, 
-                    Binder.getCallingPid());
+            ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(serviceInfo.packageName, serviceInfo.processName, userId, -1, Binder.getCallingPid());
             if (processRecord == null) {
                 return 0;
             }
@@ -108,21 +99,7 @@ public class ActiveServices {
         return 0;
     }
 
-    /**
-     * Android 8-15 bindService
-     */
     public Intent bindService(Intent intent, final IBinder binder, String resolvedType, int userId) {
-        return bindServiceInternal(intent, binder, resolvedType, userId, null);
-    }
-
-    /**
-     * Android 16+ bindService with session
-     */
-    public Intent bindServiceV2(Intent intent, final IBinder binder, String resolvedType, int userId, Object session) {
-        return bindServiceInternal(intent, binder, resolvedType, userId, session);
-    }
-
-    private Intent bindServiceInternal(Intent intent, final IBinder binder, String resolvedType, int userId, Object session) {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return intent;
@@ -131,8 +108,7 @@ public class ActiveServices {
                 serviceInfo.packageName,
                 serviceInfo.processName,
                 userId,
-                -1, 
-                Binder.getCallingPid());
+                -1, Binder.getCallingPid());
 
         if (processRecord == null) {
             throw new RuntimeException("Unable to create " + serviceInfo.name);
@@ -156,7 +132,6 @@ public class ActiveServices {
                             public void binderDied() {
                                 binder.unlinkToDeath(this, 0);
                                 mConnectedServices.remove(binder);
-                                mServiceSessions.remove(binder);
                             }
                         }, 0);
                     } catch (RemoteException e) {
@@ -165,18 +140,12 @@ public class ActiveServices {
                     connectedService.mIBinder = binder;
                     connectedService.mIntent = intent;
                     mConnectedServices.put(binder, connectedService);
-                    
-                    // Store session for Android 16+
-                    if (session != null) {
-                        mServiceSessions.put(binder, session);
-                    }
                 }
 
                 if (!isBound) {
                     runningServiceRecord.incrementBindCountAndGet();
                 }
                 runningServiceRecord.mConnectedServiceRecord = connectedService;
-                runningServiceRecord.mSession = session;
             }
         }
         return createStubServiceIntent(intent, serviceInfo, processRecord, runningServiceRecord);
@@ -191,7 +160,6 @@ public class ActiveServices {
         runningServiceRecord.mConnectedServiceRecord = null;
         runningServiceRecord.mBindCount.decrementAndGet();
         mConnectedServices.remove(binder);
-        mServiceSessions.remove(binder);
     }
 
     public void stopServiceToken(ComponentName className, IBinder token, int userId) {
@@ -214,15 +182,6 @@ public class ActiveServices {
         RunningServiceRecord remove = mRunningServiceRecords.remove(new Intent.FilterComparison(proxyIntent));
         if (remove != null) {
             mRunningTokens.remove(remove);
-            if (remove.mSession != null) {
-                // Clean up session for Android 16+
-                for (Map.Entry<IBinder, Object> entry : mServiceSessions.entrySet()) {
-                    if (entry.getValue() == remove.mSession) {
-                        mServiceSessions.remove(entry.getKey());
-                        break;
-                    }
-                }
-            }
         }
     }
 
@@ -230,33 +189,24 @@ public class ActiveServices {
         if (proxyIntent == null)
             return null;
         ProxyServiceRecord proxyServiceRecord = ProxyServiceRecord.create(proxyIntent);
-        if (proxyServiceRecord.mServiceIntent == null)
-            return null;
-        
         ComponentName component = proxyServiceRecord.mServiceIntent.getComponent();
+
         RunningServiceRecord runningServiceRecord = findRunningServiceRecord(proxyServiceRecord.mServiceIntent);
         if (runningServiceRecord == null)
             return null;
-            
         UnbindRecord record = new UnbindRecord();
         record.setComponentName(component);
         record.setBindCount(runningServiceRecord.mBindCount.get());
         record.setStartId(runningServiceRecord.mStartId.get());
-        // Android 16+ session
-        record.setSession(runningServiceRecord.mSession);
         return record;
     }
 
-    private Intent createStubServiceIntent(Intent targetIntent, ServiceInfo serviceInfo, 
-                                           ProcessRecord processRecord, RunningServiceRecord runningServiceRecord) {
+    private Intent createStubServiceIntent(Intent targetIntent, ServiceInfo serviceInfo, ProcessRecord processRecord, RunningServiceRecord runningServiceRecord) {
         Intent stub = new Intent();
-        ComponentName stubComp = new ComponentName(
-                BlackBoxCore.getHostPkg(), 
-                ProxyManifest.getProxyService(processRecord.bpid));
+        ComponentName stubComp = new ComponentName(BlackBoxCore.getHostPkg(), ProxyManifest.getProxyService(processRecord.bpid));
         stub.setComponent(stubComp);
         stub.setAction(UUID.randomUUID().toString());
-        ProxyServiceRecord.saveStub(stub, targetIntent, serviceInfo, runningServiceRecord, 
-                processRecord.userId, runningServiceRecord.mStartId.get());
+        ProxyServiceRecord.saveStub(stub, targetIntent, serviceInfo, runningServiceRecord, processRecord.userId, runningServiceRecord.mStartId.get());
         return stub;
     }
 
@@ -291,10 +241,7 @@ public class ActiveServices {
         RunningServiceInfo info = new RunningServiceInfo();
         for (RunningServiceRecord value : mRunningServiceRecords.values()) {
             ServiceInfo serviceInfo = value.mServiceInfo;
-            if (serviceInfo == null) continue;
-            
-            ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(
-                    callerPackage, serviceInfo.processName, userId);
+            ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(callerPackage, serviceInfo.processName, userId);
             if (processRecord == null)
                 continue;
             ActivityManager.RunningServiceInfo runningServiceInfo = serviceInfoMap.get(processRecord.pid);
@@ -311,10 +258,8 @@ public class ActiveServices {
         ResolveInfo resolveInfo = resolveService(intent, resolvedType, userId);
         if (resolveInfo == null)
             return null;
-        ProcessRecord processRecord = BProcessManagerService.get().findProcessRecord(
-                resolveInfo.serviceInfo.packageName, 
-                resolveInfo.serviceInfo.processName, 
-                userId);
+        ProcessRecord processRecord =
+                BProcessManagerService.get().findProcessRecord(resolveInfo.serviceInfo.packageName, resolveInfo.serviceInfo.processName, userId);
         if (processRecord == null)
             return null;
         try {
@@ -330,12 +275,14 @@ public class ActiveServices {
     }
 
     public static class RunningServiceRecord extends IEmpty.Stub {
+        // onStartCommand startId
         private final AtomicInteger mStartId = new AtomicInteger(1);
         private final AtomicInteger mBindCount = new AtomicInteger(0);
+        // 正在连接的服务
         private ConnectedServiceRecord mConnectedServiceRecord;
+
         private ServiceInfo mServiceInfo;
         private Intent mIntent;
-        private Object mSession; // Android 16+ session
 
         public int getAndIncrementStartId() {
             return mStartId.getAndIncrement();

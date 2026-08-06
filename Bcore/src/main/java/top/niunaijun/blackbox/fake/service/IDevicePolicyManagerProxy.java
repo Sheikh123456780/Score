@@ -13,7 +13,7 @@ import top.niunaijun.blackbox.fake.hook.ProxyMethod;
 import top.niunaijun.blackbox.utils.MethodParameterUtils;
 
 /**
- * Created by Milk on 2021/5/17.
+ * Created by @RIYAZXERO on 2021/5/17.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -64,7 +64,7 @@ public class IDevicePolicyManagerProxy extends BinderInvocationStub {
 
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return "BlackBox";
+            return "RIYAZcore";
         }
     }
 
@@ -73,7 +73,7 @@ public class IDevicePolicyManagerProxy extends BinderInvocationStub {
 
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return "BlackBox";
+            return "RIYAZcore";
         }
     }
 

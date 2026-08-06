@@ -6,12 +6,17 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PermissionInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.content.pm.Signature;
+import android.content.pm.VersionedPackage;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 
+import top.niunaijun.blackbox.fake.frameworks.BPackageManager;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
@@ -20,12 +25,12 @@ import java.util.List;
 
 import black.android.app.BRActivityThread;
 import black.android.app.BRContextImpl;
-import black.android.app.ContextImpl;
-//import black.android.content.pm.BRPackageManager;
+
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
+import top.niunaijun.blackbox.core.GmsCore;
 import top.niunaijun.blackbox.core.env.AppSystemEnv;
-//import top.niunaijun.blackbox.fake.FakeCore;
+
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
@@ -57,11 +62,12 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         return BRActivityThread.get().sPackageManager();
     }
 
-     @Override
+    @Override
     protected void inject(Object baseInvocation, Object proxyInvocation) {
         BRActivityThread.get()._set_sPackageManager(proxyInvocation);
         replaceSystemService("package");
         Object systemContext = BRActivityThread.get(BlackBoxCore.mainThread()).getSystemContext();
+        BRContextImpl.get(systemContext).getPackageManager();
         PackageManager mPackageManager = BRContextImpl.get(systemContext).mPackageManager();
         if (mPackageManager != null) {
             try {
@@ -86,16 +92,15 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         if (BuildCompat.isT()) {
             return;
         }
-        addMethodHook(new PkgMethodProxy("clearPackagePreferredActivities"));
     }
-
+    
     @ProxyMethod("resolveIntent")
     public static class ResolveIntent extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             Intent intent = (Intent) args[0];
             String resolvedType = (String) args[1];
-            int flags = MethodParameterUtils.toInt(args[2]);
+            int flags = Integer.parseInt(args[2] + "");
             ResolveInfo resolveInfo = BlackBoxCore.getBPackageManager().resolveIntent(intent, resolvedType, flags, BActivityThread.getUserId());
             if (resolveInfo != null) {
                 return resolveInfo;
@@ -110,7 +115,7 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             Intent intent = (Intent) args[0];
             String resolvedType = (String) args[1];
-            int flags = MethodParameterUtils.toInt(args[2]);
+            int flags = Integer.parseInt(args[2] + "");
             ResolveInfo resolveInfo = BlackBoxCore.getBPackageManager().resolveService(intent, flags, resolvedType, BActivityThread.getUserId());
             if (resolveInfo != null) {
                 return resolveInfo;
@@ -133,20 +138,17 @@ public class IPackageManagerProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String packageName = (String) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
+			if (GmsCore.isGoogleAppOrService(packageName)) {
+				return method.invoke(who, args);
+			}
             PackageInfo packageInfo = BlackBoxCore.getBPackageManager().getPackageInfo(packageName, flags, BActivityThread.getUserId());
-if (packageInfo != null) {
-    return packageInfo;
-}
-if ("com.google.android.webview".equals(packageName) || "com.android.webview".equals(packageName)) {
-    try {
-        return method.invoke(who, args); // ask real system
-    } catch (Throwable t) {
-        t.printStackTrace();
-    }
-}
-if (AppSystemEnv.isOpenPackage(packageName)) {
-    return method.invoke(who, args);
-}
+            if (packageInfo != null) {
+                return packageInfo;
+            }
+            
+            if (AppSystemEnv.isOpenPackage(packageName)) {
+                return method.invoke(who, args);
+            }
             return null;
         }
     }
@@ -159,6 +161,21 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             return method.invoke(who, args);
         }
     }
+    
+    @ProxyMethod("setApplicationBlockedSettingAsUser")
+    public static class setApplicationBlockedSettingAsUser extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            MethodParameterUtils.replaceLastUserId(args);
+            return method.invoke(who, args);
+        }
+    }
+    
+    @ProxyMethod("getPackageUidEtc")
+    public static class getPackageUidEtc extends GetPackageUid {
+
+    }
 
     @ProxyMethod("getProviderInfo")
     public static class GetProviderInfo extends MethodHook {
@@ -167,8 +184,7 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             ComponentName componentName = (ComponentName) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
             ProviderInfo providerInfo = BlackBoxCore.getBPackageManager().getProviderInfo(componentName, flags, BActivityThread.getUserId());
-            if (providerInfo != null)
-                return providerInfo;
+            if (providerInfo != null) return providerInfo;
             if (AppSystemEnv.isOpenPackage(componentName)) {
                 return method.invoke(who, args);
             }
@@ -183,8 +199,7 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             ComponentName componentName = (ComponentName) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
             ActivityInfo receiverInfo = BlackBoxCore.getBPackageManager().getReceiverInfo(componentName, flags, BActivityThread.getUserId());
-            if (receiverInfo != null)
-                return receiverInfo;
+            if (receiverInfo != null) return receiverInfo;
             if (AppSystemEnv.isOpenPackage(componentName)) {
                 return method.invoke(who, args);
             }
@@ -199,8 +214,7 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             ComponentName componentName = (ComponentName) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
             ActivityInfo activityInfo = BlackBoxCore.getBPackageManager().getActivityInfo(componentName, flags, BActivityThread.getUserId());
-            if (activityInfo != null)
-                return activityInfo;
+            if (activityInfo != null) return activityInfo;
             if (AppSystemEnv.isOpenPackage(componentName)) {
                 return method.invoke(who, args);
             }
@@ -216,8 +230,7 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             ComponentName componentName = (ComponentName) args[0];
             int flags = MethodParameterUtils.toInt(args[1]);
             ServiceInfo serviceInfo = BlackBoxCore.getBPackageManager().getServiceInfo(componentName, flags, BActivityThread.getUserId());
-            if (serviceInfo != null)
-                return serviceInfo;
+            if (serviceInfo != null) return serviceInfo;
             if (AppSystemEnv.isOpenPackage(componentName)) {
                 return method.invoke(who, args);
             }
@@ -252,21 +265,12 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             String packageName = (String) args[0];
-
             int flags = MethodParameterUtils.toInt(args[1]);
-
             ApplicationInfo applicationInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, flags, BActivityThread.getUserId());
+            if (GmsCore.isGoogleAppOrService(packageName)) {
+				return method.invoke(who, args);
+			}
             if (applicationInfo != null) {
-				Slog.d(TAG, "getApplicationInfo metaData=" + applicationInfo.metaData);
-				if (applicationInfo.metaData != null) {
-					Slog.d(TAG,"getApplicationInfo applicationInfo.metaData.get(\"com.facebook.sdk.ApplicationId\")" + applicationInfo.metaData.get("com.facebook.sdk.ApplicationId"));
-					Slog.d(TAG,"getApplicationInfo applicationInfo.metaData.get(\"com.facebook.sdk.ClientToken\")" + applicationInfo.metaData.getString("com.facebook.sdk.ClientToken"));
-					if ("com.p1.mobile.putong".equals(args[0])
-						&& TextUtils.isEmpty(applicationInfo.metaData.getString("com.facebook.sdk.ClientToken"))) {
-						// FIXME: 2023/4/14 这里很神奇，id可以获取到，token就是null，用这种方式给加上，实际上不加也行的，异常不影响后续使用
-						applicationInfo.metaData.putString("com.facebook.sdk.ClientToken", "6d8a6e54c2e859bfb2dbe047ec973ead");
-					}
-				}
 				return applicationInfo;
 			}
             if (AppSystemEnv.isOpenPackage(packageName)) {
@@ -281,8 +285,7 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             int flags = MethodParameterUtils.toInt(args[2]);
-            List<ProviderInfo> providers = BlackBoxCore.getBPackageManager().
-                    queryContentProviders(BActivityThread.getAppProcessName(), BActivityThread.getBUid(), flags, BActivityThread.getUserId());
+            List<ProviderInfo> providers = BlackBoxCore.getBPackageManager().queryContentProviders(BActivityThread.getAppProcessName(), BActivityThread.getBUid(), flags, BActivityThread.getUserId());
             return ParceledListSliceCompat.create(providers);
         }
     }
@@ -294,7 +297,8 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             Intent intent = MethodParameterUtils.getFirstParam(args, Intent.class);
             String type = MethodParameterUtils.getFirstParam(args, String.class);
             Integer flags = MethodParameterUtils.getFirstParam(args, Integer.class);
-            List<ResolveInfo> resolves = BlackBoxCore.getBPackageManager().queryBroadcastReceivers(intent, flags, type, BActivityThread.getUserId());
+            int flagValue = flags != null ? flags.intValue() : 0;
+            List<ResolveInfo> resolves = BlackBoxCore.getBPackageManager().queryBroadcastReceivers(intent, flagValue, type, BActivityThread.getUserId());
             Slog.d(TAG, "queryIntentReceivers: " + resolves);
 
             // http://androidxref.com/7.0.0_r1/xref/frameworks/base/core/java/android/app/ApplicationPackageManager.java#872
@@ -334,10 +338,10 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
     public static class GetPackagesForUid extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            int uid = (Integer) args[0];
+            int uid = MethodParameterUtils.toInt(args[0]);
             if (uid == BlackBoxCore.getHostUid()) {
                 args[0] = BActivityThread.getBUid();
-                uid = (int) args[0];
+                uid = MethodParameterUtils.toInt(args[0]);
             }
             String[] packagesForUid = BlackBoxCore.getBPackageManager().getPackagesForUid(uid);
             Slog.d(TAG, args[0] + " , " + BActivityThread.getAppProcessName() + " GetPackagesForUid: " + Arrays.toString(packagesForUid));
@@ -349,8 +353,14 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
     public static class GetInstallerPackageName extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            // fake google play
-            return "com.android.vending";
+            // FIX: Google Play Store ke liye
+            if (args != null && args.length > 0 && args[0] instanceof String) {
+                String packageName = (String) args[0];
+                if (GmsCore.VENDING_PKG.equals(packageName)) {
+                    return "com.android.vending";
+                }
+            }
+            return GmsCore.VENDING_PKG;
         }
     }
 
@@ -369,9 +379,8 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             ComponentName componentName = (ComponentName) args[0];
             String packageName = componentName.getPackageName();
-            
+
             ApplicationInfo applicationInfo = BlackBoxCore.getBPackageManager().getApplicationInfo(packageName,0, BActivityThread.getUserId());
-            
             if(applicationInfo != null){
                 return PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
             }
@@ -381,4 +390,111 @@ if (AppSystemEnv.isOpenPackage(packageName)) {
             throw new IllegalArgumentException();
         }
     }
+    
+    @ProxyMethod("addPackageToPreferred")
+    public static class addPackageToPreferred extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return 0;
+        }
+    }
+    
+    @ProxyMethod("setSplashScreenTheme")
+    public static class SetSplashScreenTheme extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            String packageName = args.length > 0 ? (String) args[0] : "unknown";
+            Slog.d(TAG, "SetSplashScreenTheme: Bypassing UID check for package: " + packageName);
+            boolean isXiaomi = BuildCompat.isMIUI() || Build.MANUFACTURER.toLowerCase().contains("xiaomi") || Build.BRAND.toLowerCase().contains("xiaomi") || Build.DISPLAY.toLowerCase().contains("hyperos");
+            if (isXiaomi) { Slog.d(TAG, "SetSplashScreenTheme: Detected Xiaomi/HyperOS, using enhanced bypass"); return null; }
+            try {
+                return method.invoke(who, args);
+            } catch (SecurityException e) {
+                Slog.w(TAG, "SetSplashScreenTheme: SecurityException caught, bypassing: " + e.getMessage());
+                return null;
+            } catch (Exception e) {
+                if (e.getCause() instanceof SecurityException) {
+                    Slog.w(TAG, "SetSplashScreenTheme: SecurityException (wrapped) caught, bypassing: " + e.getCause().getMessage());
+                    return null;
+                }
+                throw e;
+            }
+        }
+    }
+    
+    @ProxyMethod("checkSignatures")
+    public static class checkSignatures extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            if (args.length == 2) {
+                if (args[0] instanceof String && args[1] instanceof String) {
+                    String pkg1 = (String) args[0];
+                    String pkg2 = (String) args[1];
+                    PackageManager pm = BlackBoxCore.getPackageManager();
+                    try {
+                        PackageInfo pkgInfo1 = pm.getPackageInfo(pkg1, PackageManager.GET_SIGNATURES);
+                        PackageInfo pkgInfo2 = pm.getPackageInfo(pkg2, PackageManager.GET_SIGNATURES);
+                        Signature[] sigs1 = pkgInfo1.signatures;
+                        Signature[] sigs2 = pkgInfo2.signatures;
+                        if (sigs1 == null || sigs1.length == 0) {
+                            return (sigs2 == null || sigs2.length == 0) ? 1 : -1;
+                        }
+                        if (sigs2 == null || sigs2.length == 0) {
+                            return -2;
+                        }
+                        return Arrays.equals(sigs1, sigs2) ? 0 : -3;
+                    } catch (Exception e) {
+                        // Fall through
+                    }
+                }
+            }
+            return method.invoke(who, args);
+        }
+    }
+    
+    @ProxyMethod("checkUidSignatures")
+    public static class checkUidSignatures extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            // FIX: Google Play Services ke liye
+            return PackageManager.SIGNATURE_MATCH;
+        }
+    }
+    
+    @ProxyMethod("clearPackagePersistentPreferredActivities")
+    public static class clearPackagePersistentPreferredActivities extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            return method.invoke(who, args);
+        }
+    }
+    
+    @ProxyMethod("clearPackagePreferredActivities")
+    public static class clearPackagePreferredActivities extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            return method.invoke(who, args);
+        }
+    }
+    
+    @ProxyMethod("getApplicationBlockedSettingAsUser")
+    public static class getApplicationBlockedSettingAsUser extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            return method.invoke(who, args);
+        }
+    }
+    
+    @ProxyMethod("setPackageStoppedState")
+    public static class setPackageStoppedState extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            return method.invoke(who, args);
+        }
+    }
+    
 }

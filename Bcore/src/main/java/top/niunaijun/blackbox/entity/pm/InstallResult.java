@@ -32,13 +32,17 @@ public class InstallResult implements Parcelable {
         dest.writeString(this.msg);
     }
 
-    public InstallResult() {
-    }
+    public InstallResult() {}
 
     protected InstallResult(Parcel in) {
         this.success = in.readByte() != 0;
         this.packageName = in.readString();
         this.msg = in.readString();
+    }
+    
+    public InstallResult(boolean success, String msg) {
+        this.success = success;
+        this.msg = msg;
     }
 
     public InstallResult installError(String packageName, String msg) {

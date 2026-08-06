@@ -20,14 +20,6 @@ import top.niunaijun.blackbox.core.system.pm.BPackageManagerService;
 import top.niunaijun.blackbox.utils.CloseUtils;
 import top.niunaijun.blackbox.utils.FileUtils;
 
-/**
- * Created by Milk on 4/22/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class BUserManagerService extends IBUserManagerService.Stub implements ISystemService {
     private static BUserManagerService sService = new BUserManagerService();
     public final HashMap<Integer, BUserInfo> mUsers = new HashMap<>();
@@ -90,11 +82,10 @@ public class BUserManagerService extends IBUserManagerService.Stub implements IS
         synchronized (mUserLock) {
             synchronized (mUsers) {
                 BPackageManagerService.get().deleteUser(userId);
-
                 mUsers.remove(userId);
                 saveUserInfoLocked();
                 FileUtils.deleteDir(BEnvironment.getUserDir(userId));
-                FileUtils.deleteDir(BEnvironment.getExternalUserDir(userId));
+                //FileUtils.deleteDir(BEnvironment.getExternalStorageDirectory());
             }
         }
     }

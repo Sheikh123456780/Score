@@ -1,9 +1,11 @@
 package top.niunaijun.blackbox.core.system.am;
 
+import android.Manifest;
 import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.os.Binder;
@@ -26,14 +28,18 @@ import top.niunaijun.blackbox.entity.am.PendingResultData;
 import top.niunaijun.blackbox.entity.am.ReceiverData;
 import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
+import top.niunaijun.blackbox.utils.FileUtils;
 import top.niunaijun.blackbox.utils.Slog;
-import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 import static android.content.pm.PackageManager.GET_META_DATA;
 
 /**
- * Created by Milk on 3/31/21.
- * Android 16 compatible BActivityManagerService
+ * Created by @RIYAZXERO on 3/31/21.
+ * * ∧＿∧
+ * (`･ω･∥
+ * 丶　つ０
+ * しーＪ
+ * 此处无Bug
  */
 public class BActivityManagerService extends IBActivityManagerService.Stub implements ISystemService {
     public static final String TAG = "BActivityManagerService";
@@ -62,11 +68,7 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
     @Override
     public IBinder acquireContentProviderClient(ProviderInfo providerInfo) throws RemoteException {
         int callingPid = Binder.getCallingPid();
-        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(providerInfo.packageName,
-                providerInfo.processName,
-                BProcessManagerService.get().getUserIdByCallingPid(callingPid),
-                -1,
-                Binder.getCallingPid());
+        ProcessRecord processRecord = BProcessManagerService.get().startProcessLocked(providerInfo.packageName,providerInfo.processName,BProcessManagerService.get().getUserIdByCallingPid(callingPid),-1,Binder.getCallingPid());
         if (processRecord == null) {
             throw new RuntimeException("Unable to create process " + providerInfo.name);
         }
@@ -99,7 +101,7 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         shadow.setAction(intent.getAction());
         return shadow;
     }
-
+    
     @Override
     public IBinder peekService(Intent intent, String resolvedType, int userId) throws RemoteException {
         UserSpace userSpace = getOrCreateSpaceLocked(userId);
@@ -163,8 +165,7 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
 
     @Override
     public RunningAppProcessInfo getRunningAppProcesses(String callerPackage, int userId) throws RemoteException {
-        ActivityManager manager = (ActivityManager)
-                BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+        ActivityManager manager = (ActivityManager) BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
         List<ActivityManager.RunningAppProcessInfo> runningAppProcesses = manager.getRunningAppProcesses();
         Map<Integer, ActivityManager.RunningAppProcessInfo> runningProcessMap = new HashMap<>();
         for (ActivityManager.RunningAppProcessInfo runningProcess : runningAppProcesses) {
@@ -266,6 +267,29 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         }
         return -1;
     }
+    
+    @Override
+	public int checkPermission(String permission, int pid, int uid, String packageName) throws RemoteException {
+        if (permission == null) {
+            return PackageManager.PERMISSION_DENIED;
+        }
+        if (Manifest.permission.ACCOUNT_MANAGER.equals(permission)) {
+            return PackageManager.PERMISSION_GRANTED;
+        }
+        if (Manifest.permission.RECEIVE_BOOT_COMPLETED.equals(permission)) {
+            return PackageManager.PERMISSION_GRANTED;
+        }
+        if ("android.permission.BACKUP".equals(permission)) {
+            return PackageManager.PERMISSION_GRANTED;
+        }
+        if ("android.permission.INTERACT_ACROSS_USERS".equals(permission) || "android.permission.INTERACT_ACROSS_USERS_FULL".equals(permission)) {
+            return PackageManager.PERMISSION_DENIED;
+        }
+        if (uid == 0) {
+            return PackageManager.PERMISSION_GRANTED;
+        }
+        return BPackageManagerService.get().checkUidPermission(permission, uid,packageName);
+    }
 
     @Override
     public void onStartCommand(Intent intent, int userId) throws RemoteException {
@@ -304,18 +328,6 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         UserSpace userSpace = getOrCreateSpaceLocked(userId);
         synchronized (userSpace.mActiveServices) {
             return userSpace.mActiveServices.bindService(service, binder, resolvedType, userId);
-        }
-    }
-
-    /**
-     * Android 16+ bindService with session (as IBinder for AIDL compatibility)
-     */
-    @Override
-    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, IBinder session) throws RemoteException {
-        UserSpace userSpace = getOrCreateSpaceLocked(userId);
-        synchronized (userSpace.mActiveServices) {
-            // Convert IBinder session to Object if needed
-            return userSpace.mActiveServices.bindServiceV2(service, binder, resolvedType, userId, session);
         }
     }
 
@@ -375,8 +387,7 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
     private UserSpace getOrCreateSpaceLocked(int userId) {
         synchronized (mUserSpace) {
             UserSpace userSpace = mUserSpace.get(userId);
-            if (userSpace != null)
-                return userSpace;
+            if (userSpace != null) return userSpace;
             userSpace = new UserSpace();
             mUserSpace.put(userId, userSpace);
             return userSpace;

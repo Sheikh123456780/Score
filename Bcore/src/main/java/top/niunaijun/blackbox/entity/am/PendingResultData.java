@@ -18,18 +18,19 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
  * Created by BlackBox on 2022/2/28.
  */
 public class PendingResultData implements Parcelable {
-    public int mType;
-    public boolean mOrderedHint;
-    public boolean mInitialStickyHint;
-    public IBinder mToken;
-    public int mSendingUser;
+    
+    public boolean mAbortBroadcast;
+    public String mBToken;
+    public boolean mFinished;
     public int mFlags;
+    public boolean mInitialStickyHint;
+    public boolean mOrderedHint;
     public int mResultCode;
     public String mResultData;
     public Bundle mResultExtras;
-    public boolean mAbortBroadcast;
-    public boolean mFinished;
-    public String mBToken;
+    public int mSendingUser;
+    public IBinder mToken;
+    public int mType;
 
     public PendingResultData(BroadcastReceiver.PendingResult pendingResult) {
         mBToken = UUID.randomUUID().toString();
@@ -62,18 +63,14 @@ public class PendingResultData implements Parcelable {
     public BroadcastReceiver.PendingResult build() {
         if (BuildCompat.isM()) {
             return BRBroadcastReceiverPendingResultM.get()._new(mResultCode, mResultData, mResultExtras, mType, mOrderedHint, mInitialStickyHint, mToken, mSendingUser, mFlags);
-        } else {
-            return BRBroadcastReceiverPendingResult.get()._new(mResultCode, mResultData, mResultExtras, mType, mOrderedHint, mInitialStickyHint, mToken, mSendingUser);
         }
+        return BRBroadcastReceiverPendingResult.get()._new(mResultCode, mResultData, mResultExtras, mType, mOrderedHint, mInitialStickyHint, mToken, mSendingUser);
     }
 
-
-    @Override
     public int describeContents() {
         return 0;
     }
 
-    @Override
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(this.mType);
         dest.writeByte(this.mOrderedHint ? (byte) 1 : (byte) 0);
@@ -118,7 +115,7 @@ public class PendingResultData implements Parcelable {
         this.mFinished = in.readByte() != 0;
         this.mBToken = in.readString();
     }
-
+    
     public static final Parcelable.Creator<PendingResultData> CREATOR = new Parcelable.Creator<PendingResultData>() {
         @Override
         public PendingResultData createFromParcel(Parcel source) {
@@ -130,21 +127,9 @@ public class PendingResultData implements Parcelable {
             return new PendingResultData[size];
         }
     };
+    
 
-    @Override
     public String toString() {
-        return "PendingResultData{" +
-                "mType=" + mType +
-                ", mOrderedHint=" + mOrderedHint +
-                ", mInitialStickyHint=" + mInitialStickyHint +
-                ", mToken=" + mToken +
-                ", mSendingUser=" + mSendingUser +
-                ", mFlags=" + mFlags +
-                ", mResultCode=" + mResultCode +
-                ", mResultData='" + mResultData + '\'' +
-                ", mResultExtras=" + mResultExtras +
-                ", mAbortBroadcast=" + mAbortBroadcast +
-                ", mFinished=" + mFinished +
-                '}';
+        return "PendingResultData{mType=" + this.mType + ", mOrderedHint=" + this.mOrderedHint + ", mInitialStickyHint=" + this.mInitialStickyHint + ", mToken=" + this.mToken + ", mSendingUser=" + this.mSendingUser + ", mFlags=" + this.mFlags + ", mResultCode=" + this.mResultCode + ", mResultData='" + this.mResultData + '\'' + ", mResultExtras=" + this.mResultExtras + ", mAbortBroadcast=" + this.mAbortBroadcast + ", mFinished=" + this.mFinished + '}';
     }
 }

@@ -6,6 +6,9 @@ import android.os.ConditionVariable;
 import android.os.IInterface;
 import android.os.Process;
 
+import android.system.ErrnoException;
+import android.system.OsConstants;
+import java.io.FileNotFoundException;
 import java.util.Arrays;
 
 import top.niunaijun.blackbox.core.IBActivityThread;
@@ -56,7 +59,7 @@ public class ProcessRecord extends Binder {
         config.token = this;
         return config;
     }
-
+    
     public void kill() {
         if (pid > 0) {
             try {
@@ -64,6 +67,13 @@ public class ProcessRecord extends Binder {
             } catch (Throwable e) {
                 e.printStackTrace();
             }
+        }
+    }
+    
+    private void handleErrno(ErrnoException e) {
+        if (e.errno == OsConstants.ENOENT) {
+        } else {
+            e.printStackTrace();
         }
     }
 

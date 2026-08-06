@@ -1,5 +1,8 @@
 package top.niunaijun.blackbox.utils;
 
+import android.os.Parcelable;
+import android.os.Process;
+
 import java.util.Arrays;
 import java.util.HashSet;
 
@@ -85,7 +88,14 @@ public class MethodParameterUtils {
         }
         return null;
     }
-
+    
+    public static void replaceLastUserId(Object[] args) {
+        int index = args.length - 1;
+        if (index >= 0 && args[index] instanceof Integer) {
+            args[index] = BlackBoxCore.getHostUserId();
+        }
+    }
+    
     public static String replaceSequenceAppPkg(Object[] args, int sequence) {
         int index = ArrayUtils.indexOf(args, String.class, sequence);
         if (index != -1) {
@@ -144,17 +154,18 @@ public class MethodParameterUtils {
         }
     }
     
-    public static void replaceLastUserId(Object[] args) {
-        int index = args.length - 1;
-        if (index >= 0 && args[index] instanceof Integer) {
-            args[index] = BlackBoxCore.getHostUserId();
-        }
+    public static String getString(Object[] args, int index) {
+        if (args == null || index < 0 || index >= args.length) return null;
+        Object obj = args[index];
+        return obj != null ? obj.toString() : null;
     }
-
+    
     public static int toInt(Object obj){
         if(obj instanceof Long){
             return ((Long) obj).intValue();
         }
         return (int)obj;
     }
+    
+
 }

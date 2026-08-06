@@ -27,32 +27,20 @@ public class NativeUtils {
     public static final String TAG = "VirtualM";
 
     public static void copyNativeLib(File apk, File nativeLibDir) throws Exception {
-    long startTime = System.currentTimeMillis();
-    if (!nativeLibDir.exists()) {
-        nativeLibDir.mkdirs();
+        long startTime = System.currentTimeMillis();
+        if (!nativeLibDir.exists()) {
+            nativeLibDir.mkdirs();
+        }
+        try (ZipFile zipfile = new ZipFile(apk.getAbsolutePath())) {
+            if (findAndCopyNativeLib(zipfile, Build.CPU_ABI, nativeLibDir)) {
+                return;
+            }
+
+            findAndCopyNativeLib(zipfile, "armeabi", nativeLibDir);
+        } finally {
+            Log.d(TAG, "Done! +" + (System.currentTimeMillis() - startTime) + "ms");
+        }
     }
-    try (ZipFile zipfile = new ZipFile(apk.getAbsolutePath())) {
-        // 1. Try 64-bit ARM first (Required for BGMI)
-        if (findAndCopyNativeLib(zipfile, "arm64-v8a", nativeLibDir)) {
-            return;
-        }
-
-        // 2. Fallback to 32-bit ARM
-        if (findAndCopyNativeLib(zipfile, "armeabi-v7a", nativeLibDir)) {
-            return;
-        }
-
-        // 3. System ABI check
-        if (findAndCopyNativeLib(zipfile, Build.CPU_ABI, nativeLibDir)) {
-            return;
-        }
-
-        // 4. Legacy fallback
-        findAndCopyNativeLib(zipfile, "armeabi", nativeLibDir);
-    } finally {
-        Log.d(TAG, "Done! +" + (System.currentTimeMillis() - startTime) + "ms");
-    }
-}
 
 
     private static boolean findAndCopyNativeLib(ZipFile zipfile, String cpuArch, File nativeLibDir) throws Exception {
@@ -121,4 +109,3 @@ public class NativeUtils {
         input.close();
     }
 }
-

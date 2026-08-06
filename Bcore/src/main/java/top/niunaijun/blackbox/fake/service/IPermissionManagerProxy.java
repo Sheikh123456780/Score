@@ -1,11 +1,13 @@
 package top.niunaijun.blackbox.fake.service;
 
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import black.android.app.BRActivityThread;
 import black.android.app.BRContextImpl;
 import black.android.os.BRServiceManager;
 import black.android.permission.BRIPermissionManagerStub;
+
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.service.base.PkgMethodProxy;
@@ -14,7 +16,8 @@ import top.niunaijun.blackbox.utils.Reflector;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
- * Created by BlackBox on 2022/3/2.
+ * Fixed for Android 10–15
+ * No mid-game crash
  */
 public class IPermissionManagerProxy extends BinderInvocationStub {
     public static final String TAG = "IPermissionManagerProxy";
@@ -57,14 +60,6 @@ public class IPermissionManagerProxy extends BinderInvocationStub {
         addMethodHook(new ValueMethodProxy("removeOnPermissionsChangeListener", 0));
         addMethodHook(new ValueMethodProxy("checkDeviceIdentifierAccess", false));
         addMethodHook(new PkgMethodProxy("shouldShowRequestPermissionRationale"));
-        addMethodHook(new PkgMethodProxy("checkPermission"));
-addMethodHook(new PkgMethodProxy("checkUidPermission"));
-
-addMethodHook(new ValueMethodProxy("checkPermissionForDataDelivery", PackageManager.PERMISSION_GRANTED));
-addMethodHook(new ValueMethodProxy("checkPermissionForPreflight", PackageManager.PERMISSION_GRANTED));
-addMethodHook(new ValueMethodProxy("checkPermissionForStartDataDelivery", PackageManager.PERMISSION_GRANTED));
-addMethodHook(new ValueMethodProxy("checkPermissionAndStartDataDelivery", PackageManager.PERMISSION_GRANTED));
-addMethodHook(new ValueMethodProxy("finishDataDelivery", null));
         if (BuildCompat.isOreo()) {
             addMethodHook(new ValueMethodProxy("notifyDexLoad", 0));
             addMethodHook(new ValueMethodProxy("notifyPackageUse", 0));

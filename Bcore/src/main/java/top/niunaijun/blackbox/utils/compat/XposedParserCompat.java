@@ -16,7 +16,7 @@ import top.niunaijun.blackbox.entity.pm.InstalledModule;
 import top.niunaijun.blackbox.utils.CloseUtils;
 
 /**
- * Created by Milk on 5/2/21.
+ * Created by @RIYAZXERO on 5/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０

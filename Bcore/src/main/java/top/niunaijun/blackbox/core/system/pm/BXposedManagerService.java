@@ -23,7 +23,7 @@ import top.niunaijun.blackbox.utils.FileUtils;
 import top.niunaijun.blackbox.utils.compat.XposedParserCompat;
 
 /**
- * Created by Milk on 5/2/21.
+ * Created by @RIYAZXERO on 5/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -88,7 +88,7 @@ public class BXposedManagerService extends IBXposedManagerService.Stub implement
 
     @Override
     public List<InstalledModule> getInstalledModules() {
-        List<ApplicationInfo> installedApplications = mPms.getInstalledApplications(PackageManager.GET_META_DATA, BUserHandle.USER_XPOSED);
+        List<ApplicationInfo> installedApplications = mPms.getInstalledApplications(FileUtils.FileMode.MODE_IWUSR, BUserHandle.USER_XPOSED);
         synchronized (mCacheModule) {
             for (ApplicationInfo installedApplication : installedApplications) {
                 if (mCacheModule.containsKey(installedApplication.packageName))

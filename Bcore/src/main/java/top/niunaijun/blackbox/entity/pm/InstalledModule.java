@@ -8,6 +8,7 @@ import android.os.Parcelable;
 
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.core.system.user.BUserHandle;
+import top.niunaijun.blackbox.utils.FileUtils;
 
 /**
  * Created by Milk on 5/2/21.
@@ -29,11 +30,11 @@ public class InstalledModule implements Parcelable {
 
 
     public ApplicationInfo getApplication() {
-        return BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, PackageManager.GET_META_DATA, BUserHandle.USER_XPOSED);
+        return BlackBoxCore.getBPackageManager().getApplicationInfo(packageName, FileUtils.FileMode.MODE_IWUSR, BUserHandle.USER_XPOSED);
     }
 
     public PackageInfo getPackageInfo() {
-        return BlackBoxCore.getBPackageManager().getPackageInfo(packageName, PackageManager.GET_META_DATA, BUserHandle.USER_XPOSED);
+        return BlackBoxCore.getBPackageManager().getPackageInfo(packageName, FileUtils.FileMode.MODE_IWUSR, BUserHandle.USER_XPOSED);
     }
 
     @Override

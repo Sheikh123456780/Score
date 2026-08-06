@@ -1,7 +1,12 @@
 package top.niunaijun.blackbox.fake.hook;
 
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.Log;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -12,7 +17,7 @@ import java.util.Map;
 import top.niunaijun.blackbox.utils.MethodParameterUtils;
 
 /**
- * Created by Milk on 3/30/21.
+ * Created by efrit on 2026/4/26
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -49,13 +54,63 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
 
     @Override
     public void injectHook() {
+        
         mBase = getWho();
-        mProxyInvocation = Proxy.newProxyInstance(mBase.getClass().getClassLoader(), MethodParameterUtils.getAllInterface(mBase.getClass()), this);
-        if (!onlyProxy) {
-            inject(mBase, mProxyInvocation);
+        
+        
+        if (mBase == null) {
+            Log.e(TAG, "injectHook failed: mBase is null for " + this.getClass().getName());
+            
+            
+            try {
+                
+                mProxyInvocation = Proxy.newProxyInstance(
+                    this.getClass().getClassLoader(), 
+                    new Class[]{}, 
+                    this
+                );
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to create fallback proxy", e);
+            }
+            
+            
+            return;
         }
 
+        
+        try {
+            mProxyInvocation = Proxy.newProxyInstance(
+                mBase.getClass().getClassLoader(), 
+                MethodParameterUtils.getAllInterface(mBase.getClass()), 
+                this
+            );
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to create proxy for " + mBase.getClass().getName(), e);
+            
+            
+            try {
+                mProxyInvocation = Proxy.newProxyInstance(
+                    this.getClass().getClassLoader(), 
+                    new Class[]{}, 
+                    this
+                );
+            } catch (Exception e2) {
+                Log.e(TAG, "Failed to create fallback proxy", e2);
+                return;
+            }
+        }
+        
+        if (!onlyProxy && mBase != null && mProxyInvocation != null) {
+            try {
+                inject(mBase, mProxyInvocation);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to inject", e);
+            }
+        }
+        
         onBindMethod();
+        
+        
         Class<?>[] declaredClasses = this.getClass().getDeclaredClasses();
         for (Class<?> declaredClass : declaredClasses) {
             initAnnotation(declaredClass);
@@ -105,17 +160,28 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-//        for debug
-//        if(method.getName().contains("finish")){
-//            Log.d(TAG,"finishAAAAAAAAAAAAAAA:" + method.getName());
-//            Thread currentThread = Thread.currentThread();
-//            StackTraceElement[] stackTraceElements = currentThread.getStackTrace();
-//            for (StackTraceElement element : stackTraceElements) {
-//                // 打印调用栈信息
-//                Log.d(TAG,element.toString());
-//            }
-//        }
-
+        
+        if (mBase == null) {
+            Log.w(TAG, "Invoke called but mBase is null for method: " + (method != null ? method.getName() : "unknown"));
+            
+            
+            if (method != null && method.getReturnType() != null) {
+                if (method.getReturnType() == boolean.class) {
+                    return false;
+                } else if (method.getReturnType() == int.class) {
+                    return 0;
+                } else if (method.getReturnType() == long.class) {
+                    return 0L;
+                } else if (method.getReturnType() == float.class) {
+                    return 0f;
+                } else if (method.getReturnType() == double.class) {
+                    return 0.0;
+                }
+            }
+            
+            return null;
+        }
+        
         MethodHook methodHook = mMethodHookMap.get(method.getName());
         if (methodHook == null || !methodHook.isEnable()) {
             try {

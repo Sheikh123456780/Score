@@ -23,7 +23,7 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 import top.niunaijun.blackbox.utils.compat.ParceledListSliceCompat;
 
 /**
- * Created by Milk on 4/2/21.
+ * Created by @RIYAZXERO on 4/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -103,7 +103,6 @@ public class INotificationManagerProxy extends BinderInvocationStub {
         }
     }
 
-
     @ProxyMethod("enqueueNotificationWithTag")
     public static class EnqueueNotificationWithTag extends MethodHook {
 
@@ -132,8 +131,6 @@ public class INotificationManagerProxy extends BinderInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             List<?> list = BRParceledListSlice.get(args[1]).getList();
-            if (list == null)
-                return 0;
             for (Object o : list) {
                 BNotificationManager.get().createNotificationChannel((NotificationChannel) o);
             }

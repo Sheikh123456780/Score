@@ -235,33 +235,13 @@ public class BaseInstrumentationDelegate extends Instrumentation {
         return mBaseInstrumentation.newActivity(cl, className, intent);
     }
 
-@Override
-public void callActivityOnCreate(Activity activity, Bundle icicle) {
-    try {
-        if (icicle != null) {
-            // Fix: make sure bundle unparcels with the app's classloader
-            icicle.setClassLoader(activity.getClassLoader());
+    @Override
+    public void callActivityOnCreate(Activity activity, Bundle icicle) {
+        mBaseInstrumentation.callActivityOnCreate(activity, icicle);
+        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
+            appLifecycleCallback.onActivityCreated(activity, icicle);
         }
-
-        Intent intent = activity.getIntent();
-        if (intent != null) {
-            Bundle extras = intent.getExtras();
-            if (extras != null) {
-                extras.setClassLoader(activity.getClassLoader());
-            }
-        }
-    } catch (Throwable e) {
-        e.printStackTrace();
     }
-
-    // Call through to base instrumentation
-    mBaseInstrumentation.callActivityOnCreate(activity, icicle);
-
-    for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-        appLifecycleCallback.onActivityCreated(activity, icicle);
-    }
-}
-
 
     @Override
     public void callActivityOnCreate(Activity activity, Bundle icicle, PersistableBundle persistentState) {
@@ -299,47 +279,18 @@ public void callActivityOnCreate(Activity activity, Bundle icicle) {
         mBaseInstrumentation.callActivityOnPostCreate(activity, icicle, persistentState);
     }
 
-@Override
-public void callActivityOnNewIntent(Activity activity, Intent intent) {
-    try {
-        if (intent != null) {
-            Bundle extras = intent.getExtras();
-            if (extras != null) {
-                // Fix: force correct classloader for parcelables
-                extras.setClassLoader(activity.getClassLoader());
-            }
-        }
-    } catch (Throwable e) {
-        e.printStackTrace();
+    @Override
+    public void callActivityOnNewIntent(Activity activity, Intent intent) {
+        mBaseInstrumentation.callActivityOnNewIntent(activity, intent);
     }
-
-    mBaseInstrumentation.callActivityOnNewIntent(activity, intent);
-}
-
 
     @Override
-public void callActivityOnStart(Activity activity) {
-    try {
-        Intent intent = activity.getIntent();
-        if (intent != null) {
-            Bundle extras = intent.getExtras();
-            if (extras != null) {
-                // Fix: ensure unparcelling uses the correct classloader
-                extras.setClassLoader(activity.getClassLoader());
-            }
+    public void callActivityOnStart(Activity activity) {
+        mBaseInstrumentation.callActivityOnStart(activity);
+        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
+            appLifecycleCallback.onActivityStarted(activity);
         }
-    } catch (Throwable e) {
-        e.printStackTrace();
     }
-
-    // proceed with normal start
-    mBaseInstrumentation.callActivityOnStart(activity);
-
-    for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-        appLifecycleCallback.onActivityStarted(activity);
-    }
-}
-
 
     @Override
     public void callActivityOnRestart(Activity activity) {
@@ -483,8 +434,7 @@ public void callActivityOnStart(Activity activity) {
         Class<?> cls = obj.getClass();
         while (cls != null) {
             try {
-                return Reflector.on(obj.getClass())
-                        .method("execStartActivity", args);
+                return Reflector.on(obj.getClass()).method("execStartActivity", args);
             } catch (Exception e) {
                 cls = cls.getSuperclass();
             }

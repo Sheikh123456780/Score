@@ -1411,13 +1411,10 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
         if (packageName != null) {
             intent.setPackage(packageName);
         }
-        generateServicesMap(
-                mPms.queryIntentServices(intent, PackageManager.GET_META_DATA, BUserHandle.USER_ALL),
-                mAuthenticatorCache.authenticators, new RegisteredServicesParser());
+        generateServicesMap(mPms.queryIntentServices(intent, FileUtils.FileMode.MODE_IWUSR, BUserHandle.USER_ALL),mAuthenticatorCache.authenticators, new RegisteredServicesParser());
     }
 
-    private void generateServicesMap(List<ResolveInfo> services, Map<String, AuthenticatorInfo> map,
-                                     RegisteredServicesParser accountParser) {
+    private void generateServicesMap(List<ResolveInfo> services, Map<String, AuthenticatorInfo> map,RegisteredServicesParser accountParser) {
         for (ResolveInfo info : services) {
             XmlResourceParser parser = accountParser.getParser(mContext, info.serviceInfo,
                     AccountManager.AUTHENTICATOR_META_DATA_NAME);
@@ -1429,9 +1426,7 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
                         // Nothing to do
                     }
                     if (AccountManager.AUTHENTICATOR_ATTRIBUTES_NAME.equals(parser.getName())) {
-                        AuthenticatorDescription desc = parseAuthenticatorDescription(
-                                accountParser.getResources(mContext, info.serviceInfo.applicationInfo),
-                                info.serviceInfo.packageName, attributeSet);
+                        AuthenticatorDescription desc = parseAuthenticatorDescription(accountParser.getResources(mContext, info.serviceInfo.applicationInfo),info.serviceInfo.packageName, attributeSet);
                         if (desc != null) {
                             map.put(desc.type, new AuthenticatorInfo(desc, info.serviceInfo));
                         }
@@ -1794,7 +1789,7 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
             ComponentName componentName = new ComponentName(authenticatorInfo.serviceInfo.packageName, authenticatorInfo.serviceInfo.name);
             intent.setComponent(componentName);
             // call userId
-            intent.putExtra("_B_|_UserId", mAccounts.userId);
+            intent.putExtra("_G_|_UserId", mAccounts.userId);
 
             if (Log.isLoggable(TAG, Log.VERBOSE)) {
                 Log.v(TAG, "performing bindService to " + componentName);

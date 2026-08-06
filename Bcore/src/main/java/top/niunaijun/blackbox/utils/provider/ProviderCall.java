@@ -4,41 +4,38 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
-
+import android.util.Log;
 import java.io.Serializable;
-
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.utils.compat.ContentProviderCompat;
 
-/**
- * Created by Milk on 4/1/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class ProviderCall {
-    public static Bundle callSafely(String authority, String methodName, String arg, Bundle bundle) {
+    private static final String TAG = "ProviderCall";
+
+    public static Bundle call(String authority, Context context, String method, String arg, Bundle bundle, int retryCount) {
         try {
-            return call(authority, BlackBoxCore.getContext(), methodName, arg, bundle, 5);
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            Uri uri = Uri.parse("content://" + authority);
+            Bundle result = ContentProviderCompat.call(context, uri, method, arg, bundle, retryCount);
+            return result;
+        } catch (Exception e) {
+            Log.e(TAG, "Provider call failed: " + authority + ", method: " + method);
+            return null;
         }
-        return null;
     }
 
-    public static Bundle call(String authority, Context context, String method, String arg, Bundle bundle, int retryCount) throws IllegalAccessException {
-        Uri uri = Uri.parse("content://" + authority);
-        return ContentProviderCompat.call(context, uri, method, arg, bundle, retryCount);
+    public static Bundle callSafely(String authority, String methodName, String arg, Bundle bundle) {
+        try {
+            Bundle result = call(authority, BlackBoxCore.getContext(), methodName, arg, bundle, 5);
+            return result != null ? result : new Bundle();
+        } catch (Exception e) {
+            Log.e(TAG, "Safe call failed: " + authority);
+            return new Bundle();
+        }
     }
 
     public static final class Builder {
-
         private Context context;
-
         private Bundle bundle = new Bundle();
-
         private String method;
         private String auth;
         private String arg;
@@ -87,17 +84,18 @@ public class ProviderCall {
             return this;
         }
 
-        public Bundle call() throws IllegalAccessException {
-            return ProviderCall.call(auth, context, method, arg, bundle, retryCount);
+        public Bundle call() {
+            try {
+                return ProviderCall.call(auth, context, method, arg, bundle, retryCount);
+            } catch (Exception e) {
+                Log.e(TAG, "Builder call failed: " + auth);
+                return null;
+            }
         }
 
         public Bundle callSafely() {
-            try {
-                return call();
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            }
-            return null;
+            Bundle result = call();
+            return result != null ? result : new Bundle();
         }
     }
 }

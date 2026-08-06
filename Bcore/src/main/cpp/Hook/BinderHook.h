@@ -2,8 +2,8 @@
 // Created by Milk on 4/25/21.
 //
 
-#ifndef BLACKBOX_BINDERHOOK_H
-#define BLACKBOX_BINDERHOOK_H
+#ifndef VBOX_BINDERHOOK_H
+#define VBOX_BINDERHOOK_H
 
 
 #include "BaseHook.h"
@@ -13,4 +13,4 @@ public:
     static void init(JNIEnv *env);
 };
 
-#endif //BLACKBOX_BINDERHOOK_H
+#endif //VBOX_BINDERHOOK_H

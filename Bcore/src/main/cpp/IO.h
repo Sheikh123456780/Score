@@ -2,8 +2,8 @@
 // Created by Milk on 4/10/21.
 //
 
-#ifndef VIRTUALM_IO_H
-#define VIRTUALM_IO_H
+#ifndef VIRTUAL_APP_IO_H
+#define VIRTUAL_APP_IO_H
 
 #include <jni.h>
 
@@ -32,4 +32,4 @@ public:
 };
 
 
-#endif //VIRTUALM_IO_H
+#endif //VIRTUAL_APP_IO_H

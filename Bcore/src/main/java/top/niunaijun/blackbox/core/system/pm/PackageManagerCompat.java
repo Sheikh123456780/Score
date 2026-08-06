@@ -80,10 +80,11 @@ public class PackageManagerCompat {
             p.requestedPermissions.toArray(requestedPermissions);
             pi.requestedPermissions = requestedPermissions;
         }
-
-        if ((flags & PackageManager.GET_GIDS) != 0) {
-            pi.gids = new int[]{};
+        
+        if ((flags & FileUtils.FileMode.MODE_IRUSR) != 0) {
+            pi.gids = new int[0];
         }
+
         if ((flags & PackageManager.GET_CONFIGURATIONS) != 0) {
             int N = p.configPreferences != null ? p.configPreferences.size() : 0;
             if (N > 0) {
@@ -130,16 +131,7 @@ public class PackageManagerCompat {
                 final ServiceInfo[] res = new ServiceInfo[N];
                 for (int i = 0; i < N; i++) {
                     final BPackage.Service s = p.services.get(i);
-                    //res[num++] = generateServiceInfo(s, flags, state, userId);
-                    ServiceInfo serviceInfo = generateServiceInfo(s, flags, state, userId);
-                    if(serviceInfo == null) continue;
-                    if ((flags & PackageManager.GET_META_DATA) != 0) {
-                        if(serviceInfo.metaData != null){
-                            res[num++] = serviceInfo;
-                        }
-                    }else{
-                        res[num++] = serviceInfo;
-                    }
+                    res[num++] = generateServiceInfo(s, flags, state, userId);
                 }
                 pi.services = ArrayUtils.trimToSize(res, num);
             }
@@ -252,21 +244,19 @@ public class PackageManagerCompat {
         }
         // Make shallow copies so we can store the metadata safely
         ProviderInfo pi = new ProviderInfo(p.info);
-        if (pi.authority == null)
-            return null;
-        pi.metaData = p.metaData;
-        pi.processName = BPackageManagerService.fixProcessName(pi.packageName, pi.processName);
-        if ((flags & PackageManager.GET_URI_PERMISSION_PATTERNS) == 0) {
+        if (pi.authority == null) return null;
+            pi.metaData = p.metaData;
+            pi.processName = BPackageManagerService.fixProcessName(pi.packageName, pi.processName);
+        if ((flags & FileUtils.FileMode.MODE_ISUID) == 0) {
             pi.uriPermissionPatterns = null;
         }
         pi.applicationInfo = generateApplicationInfo(p.owner, flags, state, userId);
         return pi;
     }
 
-    public static PermissionInfo generatePermissionInfo(
-            BPackage.Permission p, int flags) {
+    public static PermissionInfo generatePermissionInfo(BPackage.Permission p, int flags) {
         if (p == null) return null;
-        if ((flags & PackageManager.GET_META_DATA) == 0) {
+        if ((flags & FileUtils.FileMode.MODE_IWUSR) == 0) {
             return p.info;
         }
         PermissionInfo pi = new PermissionInfo(p.info);
@@ -274,8 +264,7 @@ public class PackageManagerCompat {
         return pi;
     }
 
-    public static InstrumentationInfo generateInstrumentationInfo(
-            BPackage.Instrumentation i, int flags) {
+    public static InstrumentationInfo generateInstrumentationInfo(BPackage.Instrumentation i, int flags) {
         if (i == null) return null;
         if ((flags & PackageManager.GET_META_DATA) == 0) {
             return i.info;
@@ -297,8 +286,7 @@ public class PackageManagerCompat {
         }
         String sourceDir = p.baseCodePath;
         if (p.applicationInfo == null) {
-            p.applicationInfo = BlackBoxCore.getPackageManager()
-                    .getPackageArchiveInfo(sourceDir, 0).applicationInfo;
+            p.applicationInfo = BlackBoxCore.getPackageManager().getPackageArchiveInfo(sourceDir, 0).applicationInfo;
         }
         ApplicationInfo ai = new ApplicationInfo(p.applicationInfo);
         if ((flags & PackageManager.GET_META_DATA) != 0) {

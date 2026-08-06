@@ -12,7 +12,7 @@ import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
- * Created by Milk on 4/18/21.
+ * Created by @RIYAZXERO on 4/18/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -22,20 +22,13 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 public class FileProviderHandler {
 
     public static Uri convertFileUri(Context context, Uri uri) {
-        if (uri == null)
-    return null;
-
-if (BuildCompat.isN()) {
-    File file = convertFile(context, uri);
-    if (file == null)
+        if (BuildCompat.isN()) {
+            File file = convertFile(context, uri);
+            if (file == null)
+                return null;
+            return BlackBoxCore.getBStorageManager().getUriForFile(file.getAbsolutePath());
+        }
         return uri;
-
-    String path = top.niunaijun.blackbox.core.IOCore.get()
-        .redirectPath(file.getAbsolutePath());
-    return BlackBoxCore.getBStorageManager().getUriForFile(path);
-}
-
-return uri;
     }
 
     public static File convertFile(Context context, Uri uri) {
@@ -46,9 +39,8 @@ return uri;
                 if (fileForUri != null && fileForUri.exists()) {
                     return fileForUri;
                 }
-            } catch (Throwable e) {
-    e.printStackTrace();
-}
+            } catch (Exception ignored) {
+            }
         }
         return null;
     }

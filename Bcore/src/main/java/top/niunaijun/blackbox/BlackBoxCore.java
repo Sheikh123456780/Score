@@ -1,8 +1,9 @@
 package top.niunaijun.blackbox;
 
+import android.app.Activity;
+import android.widget.Toast;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
-import android.app.Application;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -11,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.MetaCore.RemoteManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -20,38 +22,29 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Process;
-import android.content.Context;
-import android.util.Log;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.FileOutputStream;
-import java.io.File;
+import dalvik.system.DexFile;
+import java.io.BufferedReader;
 import java.io.IOException;
+import me.weishu.reflection.Reflection;
 
 import java.io.File;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import black.android.app.Activity;
 import black.android.app.BRActivityThread;
 import black.android.os.BRUserHandle;
-import me.weishu.reflection.Reflection;
-import android.content.res.Resources;
-
-import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.app.LauncherActivity;
 import top.niunaijun.blackbox.app.configuration.AppLifecycleCallback;
 import top.niunaijun.blackbox.app.configuration.ClientConfiguration;
 import top.niunaijun.blackbox.core.GmsCore;
-import top.niunaijun.blackbox.core.NativeCore;
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.core.system.DaemonService;
 import top.niunaijun.blackbox.core.system.ServiceManager;
 import top.niunaijun.blackbox.core.system.user.BUserHandle;
 import top.niunaijun.blackbox.core.system.user.BUserInfo;
+import top.niunaijun.blackbox.entity.AppConfig;
 import top.niunaijun.blackbox.entity.pm.InstallOption;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
 import top.niunaijun.blackbox.entity.pm.InstalledModule;
@@ -71,15 +64,17 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 import top.niunaijun.blackbox.utils.compat.BundleCompat;
 import top.niunaijun.blackbox.utils.compat.XposedParserCompat;
 import top.niunaijun.blackbox.utils.provider.ProviderCall;
-
+import top.niunaijun.blackbox.core.system.api.MetaActivationManager;
+import org.lsposed.lsparanoid.Obfuscate;
 /**
- * Created by Milk on 3/30/21.
+ * Created by @OfficialxEVIL on 3/30/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
  * しーＪ
  * 此处无Bug
  */
+@Obfuscate
 @SuppressLint({"StaticFieldLeak", "NewApi"})
 public class BlackBoxCore extends ClientConfiguration {
     public static final String TAG = "BlackBoxCore";
@@ -94,7 +89,8 @@ public class BlackBoxCore extends ClientConfiguration {
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final int mHostUid = Process.myUid();
     private final int mHostUserId = BRUserHandle.get().myUserId();
-
+    private AppConfig appConfig;
+    
     public static BlackBoxCore get() {
         return sBlackBoxCore;
     }
@@ -123,6 +119,10 @@ public class BlackBoxCore extends ClientConfiguration {
         return sContext;
     }
 
+    public AppConfig getAppConfig() {
+        return appConfig;
+    }
+
     public Thread.UncaughtExceptionHandler getExceptionHandler() {
         return mExceptionHandler;
     }
@@ -130,11 +130,24 @@ public class BlackBoxCore extends ClientConfiguration {
     public void setExceptionHandler(Thread.UncaughtExceptionHandler exceptionHandler) {
         mExceptionHandler = exceptionHandler;
     }
+    
+    public static void setHideRoot(boolean hideRoot) { 
+        RemoteManager.sHideRoot = hideRoot; 
+    }
+    
+    public static void setHideXposed(boolean hide) {
+        RemoteManager.sHideXposed = hide;
+    }
+    
+    public static void setEnableDaemonService(boolean enableDaemonService) { 
+        RemoteManager.sEnableDaemonService = enableDaemonService; 
+    }
 
     public void doAttachBaseContext(Context context, ClientConfiguration clientConfiguration) {
         if (clientConfiguration == null) {
             throw new IllegalArgumentException("ClientConfiguration is null!");
         }
+        
         Reflection.unseal(context);
         sContext = context;
         mClientConfiguration = clientConfiguration;
@@ -144,26 +157,27 @@ public class BlackBoxCore extends ClientConfiguration {
         if (processName.equals(BlackBoxCore.getHostPkg())) {
             mProcessType = ProcessType.Main;
             startLogcat();
-        } else if (processName.endsWith(getContext().getString(R.string.black_box_service_name))) {
+        } else if (processName.endsWith(getContext().getString(R.string.vbox_service_name))) {
             mProcessType = ProcessType.Server;
         } else {
             mProcessType = ProcessType.BAppClient;
         }
+
         if (BlackBoxCore.get().isBlackProcess()) {
             BEnvironment.load();
         }
+        
         if (isServerProcess()) {
-            if (clientConfiguration.isEnableDaemonService()) {
+            if (RemoteManager.sEnableDaemonService) {
                 Intent intent = new Intent();
                 intent.setClass(getContext(), DaemonService.class);
-                if (BuildCompat.isOreo()) {
+                if (BuildCompat.isOreo_MR1()) {
                     getContext().startForegroundService(intent);
                 } else {
                     getContext().startService(intent);
                 }
             }
         }
-        
         HookManager.get().init();
     }
 
@@ -175,10 +189,6 @@ public class BlackBoxCore extends ClientConfiguration {
         if (!isServerProcess()) {
             ServiceManager.initBlackManager();
         }
-        copyRawToInternal(getContext());
-
-
-
     }
 
     public static Object mainThread() {
@@ -186,10 +196,17 @@ public class BlackBoxCore extends ClientConfiguration {
     }
 
     public void startActivity(Intent intent, int userId) {
+        if (intent == null) { return; }
         if (mClientConfiguration.isEnableLauncherActivity()) {
             LauncherActivity.launch(intent, userId);
         } else {
             getBActivityManager().startActivity(intent, userId);
+        }
+    }
+    
+    public void onBeforeMainLaunchApk(String packageName,int userid) {
+        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
+            appLifecycleCallback.beforeMainLaunchApk(packageName,userid);
         }
     }
 
@@ -208,20 +225,28 @@ public class BlackBoxCore extends ClientConfiguration {
     public static BStorageManager getBStorageManager() {
         return BStorageManager.get();
     }
+  
+   public boolean launchApk(String packageName, int userId) {
+		onBeforeMainLaunchApk(packageName, userId);
+		Intent launchIntent = getBPackageManager().getLaunchIntentForPackage(packageName, userId);
+		if (launchIntent == null) {
+			Slog.e(TAG, "Launch intent is null for package: " + packageName);
+			return false;
+		}
+		if (launchIntent.getComponent() == null && launchIntent.getPackage() == null) {
+			Slog.e(TAG, "Invalid launch intent: " + packageName);
+			return false;
+		}
+		launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			startActivity(launchIntent, userId);
+		} catch (Throwable e) {
+			Slog.e(TAG, "Launch failed: " + packageName, e);
+			return false;
+		}
+		return true;
+	}
 
-    public boolean launchApk(String packageName, int userId) {
-        onBeforeMainLaunchApk(packageName,userId);
-
-        Intent launchIntentForPackage = getBPackageManager().getLaunchIntentForPackage(packageName, userId);
-        if (launchIntentForPackage == null) {
-            return false;
-        }
-        startActivity(launchIntentForPackage, userId);
-        
-        bypass();
-        
-        return true;
-    }
 
     public boolean isInstalled(String packageName, int userId) {
         return getBPackageManager().isInstalled(packageName, userId);
@@ -236,14 +261,14 @@ public class BlackBoxCore extends ClientConfiguration {
     }
 
     public InstallResult installPackageAsUser(String packageName, int userId) {
-        try {
-            PackageInfo packageInfo = getPackageManager().getPackageInfo(packageName, 0);
-            return getBPackageManager().installPackageAsUser(packageInfo.applicationInfo.sourceDir, InstallOption.installBySystem(), userId);
-        } catch (PackageManager.NameNotFoundException e) {
-            e.printStackTrace();
-            return new InstallResult().installError(e.getMessage());
-        }
-    }
+		try {
+			PackageInfo packageInfo = getPackageManager().getPackageInfo(packageName, 0);
+			return getBPackageManager().installPackageAsUser(packageInfo.applicationInfo.sourceDir, InstallOption.installBySystem(), userId);
+		} catch (PackageManager.NameNotFoundException e) {
+			e.printStackTrace();
+			return new InstallResult().installError(e.getMessage());
+		}
+	}
 
     public InstallResult installPackageAsUser(File apk, int userId) {
         return getBPackageManager().installPackageAsUser(apk.getAbsolutePath(), InstallOption.installByStorage(), userId);
@@ -319,6 +344,10 @@ public class BlackBoxCore extends ClientConfiguration {
     public void stopPackage(String packageName, int userId) {
         BPackageManager.get().stopPackage(packageName, userId);
     }
+    
+    public boolean isAppRunning(String packageName, int userId) {
+        return getBPackageManager().isAppRunning(packageName, userId);
+    }
 
     public List<BUserInfo> getUsers() {
         return BUserManager.get().getUsers();
@@ -328,6 +357,10 @@ public class BlackBoxCore extends ClientConfiguration {
         return BUserManager.get().createUser(userId);
     }
 
+    public ApplicationInfo getApplicationInfo(String packageName) {
+        return BPackageManager.get().getApplicationInfo(packageName, 0, 0);
+    }
+    
     public void deleteUser(int userId) {
         BUserManager.get().deleteUser(userId);
     }
@@ -367,30 +400,19 @@ public class BlackBoxCore extends ClientConfiguration {
             return binder;
         }
         Bundle bundle = new Bundle();
-        bundle.putString("_B_|_server_name_", name);
+        bundle.putString("_G_|_server_name_", name);
         Bundle vm = ProviderCall.callSafely(ProxyManifest.getBindProvider(), "VM", null, bundle);
-        binder = BundleCompat.getBinder(vm, "_B_|_server_");
+        binder = BundleCompat.getBinder(vm, "_G_|_server_");
         Slog.d(TAG, "getService: " + name + ", " + binder);
         mServices.put(name, binder);
         return binder;
     }
 
-    /**
-     * Process type
-     */
+    //Process type
     private enum ProcessType {
-        /**
-         * Server process
-         */
-        Server,
-        /**
-         * Black app process
-         */
-        BAppClient,
-        /**
-         * Main process
-         */
-        Main,
+        Server, //Server process
+        BAppClient, //Black app process
+        Main, //Main process
     }
 
     public boolean isBlackProcess() {
@@ -406,13 +428,8 @@ public class BlackBoxCore extends ClientConfiguration {
     }
 
     @Override
-    public boolean isHideRoot() {
-        return mClientConfiguration.isHideRoot();
-    }
-
-    @Override
-    public boolean isHideXposed() {
-        return mClientConfiguration.isHideXposed();
+    public boolean setHideRoot() {
+        return mClientConfiguration.setHideRoot();
     }
 
     @Override
@@ -421,13 +438,13 @@ public class BlackBoxCore extends ClientConfiguration {
     }
 
     @Override
-    public boolean requestInstallPackage(File file, int userId) {
-        return mClientConfiguration.requestInstallPackage(file, userId);
+    public boolean requestInstallPackage(File file) {
+        return mClientConfiguration.requestInstallPackage(file);
     }
-
+    
     private void startLogcat() {
         new Thread(() -> {
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), getContext().getPackageName() + "_logcat.txt");
+            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), getContext().getPackageName() + "_logcat.txt");
             FileUtils.deleteDir(file);
             ShellUtils.execCommand("logcat -c", false);
             ShellUtils.execCommand("logcat -f " + file.getAbsolutePath(), false);
@@ -460,9 +477,9 @@ public class BlackBoxCore extends ClientConfiguration {
 
     private void initNotificationManager() {
         NotificationManager nm = (NotificationManager) BlackBoxCore.getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        String CHANNEL_ONE_ID = BlackBoxCore.getContext().getPackageName() + ".blackbox_core";
-        String CHANNEL_ONE_NAME = "blackbox_core";
-        if (BuildCompat.isOreo()) {
+        String CHANNEL_ONE_ID = BlackBoxCore.getContext().getPackageName() + ".RIYAZ_core";
+        String CHANNEL_ONE_NAME = "RIYAZ_core";
+        if (BuildCompat.isOreo_MR1()) {
             NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ONE_ID,CHANNEL_ONE_NAME, NotificationManager.IMPORTANCE_HIGH);
             notificationChannel.enableLights(true);
             notificationChannel.setLightColor(Color.RED);
@@ -471,140 +488,10 @@ public class BlackBoxCore extends ClientConfiguration {
             nm.createNotificationChannel(notificationChannel);
         }
     }
-    
-    public void onBeforeMainLaunchApk(String packageName,int userid) {
-        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.beforeMainLaunchApk(packageName,userid);
-        }
+
+    // 20240801 add request permission add start 0
+    public boolean checkSelfPermission(String permission) {
+        return getPackageManager().checkPermission(permission, getHostPackageName()) == 0;
     }
-    public void onBeforeMainApplicationAttach(Application app, Context context) {
-        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.beforeMainApplicationAttach(app, context);
-        }
-    }
-    public void onAfterMainApplicationAttach(Application app, Context context) {
-        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.afterMainApplicationAttach(app, context);
-        }
-    }
-    public void onBeforeMainActivityOnCreate(android.app.Activity activity) {
-        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.beforeMainActivityOnCreate(activity);
-        }
-    }
-    public void onAfterMainActivityOnCreate(android.app.Activity activity) {
-        for (AppLifecycleCallback appLifecycleCallback : BlackBoxCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.afterMainActivityOnCreate(activity);
-        }
-    }
-    
-    
-    // Inside BlackBoxCore.java
-// Inside BlackBoxCore.java
-private void copyRawToInternal(Context context) {
-    String fileName = "temp"; // name used later by runant/excpp
-    File dataDir;
-
-    // Prefer using the context's data dir (API 24+). If sContext exists and is the same app context, you can replace context with sContext.
-    try {
-        dataDir = context.getDataDir();
-    } catch (NoSuchMethodError e) {
-        // Fallback for older APIs: derive data dir from filesDir parent
-        dataDir = context.getFilesDir().getParentFile();
-    }
-
-    File outDir = new File(dataDir, "blackbox/cache");
-    if (!outDir.exists()) {
-        if (!outDir.mkdirs()) {
-            Log.e("CopyFile", "Failed to create directory: " + outDir.getAbsolutePath());
-            // still try to continue — might fail later when writing file
-        }
-    }
-
-    File outFile = new File(outDir, fileName);
-
-    if (!outFile.exists()) {
-        try (InputStream in = context.getResources().openRawResource(R.raw.temp);
-             OutputStream out = new FileOutputStream(outFile)) {
-
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-            }
-            out.flush();
-
-            // Set permissions so exec can run it (owner and group/others)
-            // Note: File.setExecutable(boolean, boolean) second arg = ownerOnly; set to false to allow all users (if necessary)
-            outFile.setExecutable(true, false);
-            outFile.setReadable(true, false);
-            outFile.setWritable(true, false);
-
-            Log.d("CopyFile", "File copied to: " + outFile.getAbsolutePath());
-        } catch (Resources.NotFoundException rnfe) {
-            Log.e("CopyFile", "Raw resource not found: " + rnfe.getMessage());
-        } catch (IOException e) {
-            e.printStackTrace();
-            Log.e("CopyFile", "Error copying file: " + e.getMessage());
-        }
-    } else {
-        Log.d("CopyFile", "File already exists at: " + outFile.getAbsolutePath());
-    }
-}
-
-
-
-
-void runant(final String nf) {
-    excpp("/blackbox/cache/" + nf);
-}
-
-private void ExecuteElf(String shell) {
-    try {
-        Runtime.getRuntime().exec(shell);
-    } catch (Exception e) {
-        e.printStackTrace();
-    }
-}
-
-public void excpp(String path) {
-    try {
-        // Full path → /data/data/<package>/blackbox/cache/<file>
-        String fullPath = sContext.getDataDir() + path;
-
-        // Normal exec
-        ExecuteElf("chmod 777 " + fullPath);
-        ExecuteElf(fullPath);
-
-        // Root exec (optional, if normal fails)
-      //  ExecuteElf("su -c chmod 777 " + fullPath);
-     //   ExecuteElf("su -c " + fullPath);
-
-    } catch (Exception e) {
-        e.printStackTrace();
-    }
-}
-
-public void bypass() {
-    Handler handler = new Handler(Looper.getMainLooper());
-
-    // After 15 sec
-    handler.postDelayed(() -> {
-        runant("temp 992");
-
-        // After another 30 sec
-        handler.postDelayed(() -> {
-            runant("temp 992");
-
-            // After another 38 sec
-            handler.postDelayed(() -> {
-                runant("temp 992");
-            }, 38_000);
-
-        }, 30_000);
-
-    }, 15_000);
-}
-
-
+    // 20240801 add request permission add end 0
 }

@@ -8,11 +8,17 @@ import java.lang.reflect.Method;
 
 import black.android.app.usage.BRIStorageStatsManagerStub;
 import black.android.os.BRServiceManager;
+
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
+import top.niunaijun.blackbox.fake.hook.MethodHook;
+import top.niunaijun.blackbox.fake.hook.ProxyMethod;
 import top.niunaijun.blackbox.utils.MethodParameterUtils;
+import top.niunaijun.blackbox.utils.Slog;
 
 /**
- * Created by BlackBox on 2022/3/3.
+ * StorageStats compatibility proxy
+ * Android 8 → Android 17
+ * PUBG / BGMI update & permission fix
  */
 @TargetApi(Build.VERSION_CODES.O)
 public class IStorageStatsManagerProxy extends BinderInvocationStub {

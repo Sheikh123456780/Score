@@ -7,7 +7,7 @@ import android.os.IBinder;
 import top.niunaijun.blackbox.utils.compat.BundleCompat;
 
 /**
- * Created by Milk on 3/31/21.
+ * Created by @RIYAZXERO on 3/31/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -28,17 +28,17 @@ public class ProxyActivityRecord {
     }
 
     public static void saveStub(Intent shadow, Intent target, ActivityInfo activityInfo, IBinder activityRecord, int userId) {
-        shadow.putExtra("_B_|_user_id_", userId);
-        shadow.putExtra("_B_|_activity_info_", activityInfo);
-        shadow.putExtra("_B_|_target_", target);
-        BundleCompat.putBinder(shadow, "_B_|_activity_record_v_", activityRecord);
+        shadow.putExtra("_G_|_user_id_", userId);
+        shadow.putExtra("_G_|_activity_info_", activityInfo);
+        shadow.putExtra("_G_|_target_", target);
+        BundleCompat.putBinder(shadow, "_G_|_activity_record_v_", activityRecord);
     }
 
     public static ProxyActivityRecord create(Intent intent) {
-        int userId = intent.getIntExtra("_B_|_user_id_", 0);
-        ActivityInfo activityInfo = intent.getParcelableExtra("_B_|_activity_info_");
-        Intent target = intent.getParcelableExtra("_B_|_target_");
-        IBinder activityRecord = BundleCompat.getBinder(intent, "_B_|_activity_record_v_");
+        int userId = intent.getIntExtra("_G_|_user_id_", 0);
+        ActivityInfo activityInfo = intent.getParcelableExtra("_G_|_activity_info_");
+        Intent target = intent.getParcelableExtra("_G_|_target_");
+        IBinder activityRecord = BundleCompat.getBinder(intent, "_G_|_activity_record_v_");
         return new ProxyActivityRecord(userId, activityInfo, target, activityRecord);
     }
 }

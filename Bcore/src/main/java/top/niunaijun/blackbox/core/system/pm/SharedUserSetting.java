@@ -26,7 +26,7 @@ import java.util.Map;
 
 import top.niunaijun.blackbox.core.env.BEnvironment;
 import top.niunaijun.blackbox.utils.FileUtils;
-import java.io.File;
+
 /**
  * Settings data for a particular shared user ID we know about.
  */
@@ -70,73 +70,45 @@ public final class SharedUserSetting implements Parcelable {
     }
 
     public static void loadSharedUsers() {
-    Parcel parcel = Parcel.obtain();
-    try {
-        File file = BEnvironment.getSharedUserConf();
-        if (file == null || !file.exists() || file.length() == 0)
-            return;
-
-        byte[] bytes = FileUtils.toByteArray(file);
-        if (bytes == null || bytes.length == 0)
-            return;
-
-        parcel.unmarshall(bytes, 0, bytes.length);
-        parcel.setDataPosition(0);
-
-        HashMap<String, SharedUserSetting> map =
-                parcel.readHashMap(SharedUserSetting.class.getClassLoader());
-
-        synchronized (sSharedUsers) {
-            sSharedUsers.clear();
-            if (map != null) {
-                sSharedUsers.putAll(map);
-            }
-        }
-    } catch (Throwable e) {
-        e.printStackTrace();
-
-        // Delete corrupted cache so it will be rebuilt
+        Parcel parcel = Parcel.obtain();
         try {
-            File file = BEnvironment.getSharedUserConf();
-            if (file != null && file.exists()) {
-                file.delete();
-            }
-        } catch (Throwable ignored) {
-        }
+            byte[] sharedUsersBytes = FileUtils.toByteArray(BEnvironment.getSharedUserConf());
+            parcel.unmarshall(sharedUsersBytes, 0, sharedUsersBytes.length);
+            parcel.setDataPosition(0);
 
-        synchronized (sSharedUsers) {
-            sSharedUsers.clear();
+            HashMap hashMap = parcel.readHashMap(SharedUserSetting.class.getClassLoader());
+            synchronized (sSharedUsers) {
+                sSharedUsers.clear();
+                sSharedUsers.putAll(hashMap);
+            }
+        } catch (Exception e) {
+//            e.printStackTrace();
+        } finally {
+            parcel.recycle();
         }
-    } finally {
-        parcel.recycle();
     }
-}
 
     @Override
     public int describeContents() {
         return 0;
     }
 
-    
-public void readFromParcel(Parcel source) {
-    this.name = source.readString();
-    this.userId = source.readInt();
-    this.seInfoTargetSdkVersion = source.readInt();
-}
-    
-@Override
-public void writeToParcel(Parcel dest, int flags) {
-    dest.writeString(this.name);
-    dest.writeInt(this.userId);
-    dest.writeInt(this.seInfoTargetSdkVersion);
-}
-    
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(this.name);
+        dest.writeInt(this.userId);
+        dest.writeInt(this.seInfoTargetSdkVersion);
+    }
+
+    public void readFromParcel(Parcel source) {
+        this.name = source.readString();
+        this.userId = source.readInt();
+    }
 
     protected SharedUserSetting(Parcel in) {
-    this.name = in.readString();
-    this.userId = in.readInt();
-    this.seInfoTargetSdkVersion = in.readInt();
-}
+        this.name = in.readString();
+        this.userId = in.readInt();
+    }
 
     public static final Parcelable.Creator<SharedUserSetting> CREATOR = new Parcelable.Creator<SharedUserSetting>() {
         @Override

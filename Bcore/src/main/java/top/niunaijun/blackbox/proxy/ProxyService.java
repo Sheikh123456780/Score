@@ -31,7 +31,7 @@ public class ProxyService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        AppServiceDispatcher.get().onStartCommand(intent, flags, startId);
+        AppServiceDispatcher.get().onStartCommand(intent);
         return START_NOT_STICKY;
     }
 
@@ -66,210 +66,60 @@ public class ProxyService extends Service {
     }
 
     private void showNotification() {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".blackbox_proxy")
-                .setPriority(NotificationCompat.PRIORITY_MAX);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".RIYAZcore_Proxy").setPriority(NotificationCompat.PRIORITY_MAX);
         if (BuildCompat.isOreo()) {
             startForeground(BlackBoxCore.getHostPkg().hashCode(), builder.build());
         }
     }
 
-    public static class P0 extends ProxyService {
+    public static class P0 extends ProxyService { }
 
-    }
+    public static class P1 extends ProxyService { }
 
-    public static class P1 extends ProxyService {
+    public static class P2 extends ProxyService { }
 
-    }
+    public static class P3 extends ProxyService { }
 
-    public static class P2 extends ProxyService {
+    public static class P4 extends ProxyService { }
 
-    }
+    public static class P5 extends ProxyService { }
 
-    public static class P3 extends ProxyService {
+    public static class P6 extends ProxyService { }
 
-    }
+    public static class P7 extends ProxyService { }
 
-    public static class P4 extends ProxyService {
+    public static class P8 extends ProxyService { }
 
-    }
+    public static class P9 extends ProxyService { }
 
-    public static class P5 extends ProxyService {
+    public static class P10 extends ProxyService { }
 
-    }
+    public static class P11 extends ProxyService { }
 
-    public static class P6 extends ProxyService {
+    public static class P12 extends ProxyService { }
 
-    }
+    public static class P13 extends ProxyService { }
 
-    public static class P7 extends ProxyService {
+    public static class P14 extends ProxyService { }
 
-    }
+    public static class P15 extends ProxyService { }
 
-    public static class P8 extends ProxyService {
+    public static class P16 extends ProxyService { }
 
-    }
+    public static class P17 extends ProxyService { }
 
-    public static class P9 extends ProxyService {
+    public static class P18 extends ProxyService { }
 
-    }
+    public static class P19 extends ProxyService { }
 
-    public static class P10 extends ProxyService {
+    public static class P20 extends ProxyService { }
 
-    }
+    public static class P21 extends ProxyService { }
 
-    public static class P11 extends ProxyService {
+    public static class P22 extends ProxyService { }
 
-    }
+    public static class P23 extends ProxyService { }
 
-    public static class P12 extends ProxyService {
+    public static class P24 extends ProxyService { }
 
-    }
-
-    public static class P13 extends ProxyService {
-
-    }
-
-    public static class P14 extends ProxyService {
-
-    }
-
-    public static class P15 extends ProxyService {
-
-    }
-
-    public static class P16 extends ProxyService {
-
-    }
-
-    public static class P17 extends ProxyService {
-
-    }
-
-    public static class P18 extends ProxyService {
-
-    }
-
-    public static class P19 extends ProxyService {
-
-    }
-
-    public static class P20 extends ProxyService {
-
-    }
-
-    public static class P21 extends ProxyService {
-
-    }
-
-    public static class P22 extends ProxyService {
-
-    }
-
-    public static class P23 extends ProxyService {
-
-    }
-
-    public static class P24 extends ProxyService {
-
-    }
-
-    public static class P25 extends ProxyService {
-
-    }
-
-    public static class P26 extends ProxyService {
-
-    }
-
-    public static class P27 extends ProxyService {
-
-    }
-
-    public static class P28 extends ProxyService {
-
-    }
-
-    public static class P29 extends ProxyService {
-
-    }
-
-    public static class P30 extends ProxyService {
-
-    }
-
-    public static class P31 extends ProxyService {
-
-    }
-
-    public static class P32 extends ProxyService {
-
-    }
-
-    public static class P33 extends ProxyService {
-
-    }
-
-    public static class P34 extends ProxyService {
-
-    }
-
-    public static class P35 extends ProxyService {
-
-    }
-
-    public static class P36 extends ProxyService {
-
-    }
-
-    public static class P37 extends ProxyService {
-
-    }
-
-    public static class P38 extends ProxyService {
-
-    }
-
-    public static class P39 extends ProxyService {
-
-    }
-
-    public static class P40 extends ProxyService {
-
-    }
-
-    public static class P41 extends ProxyService {
-
-    }
-
-    public static class P42 extends ProxyService {
-
-    }
-
-    public static class P43 extends ProxyService {
-
-    }
-
-    public static class P44 extends ProxyService {
-
-    }
-
-    public static class P45 extends ProxyService {
-
-    }
-
-    public static class P46 extends ProxyService {
-
-    }
-
-    public static class P47 extends ProxyService {
-
-    }
-
-    public static class P48 extends ProxyService {
-
-    }
-
-    public static class P49 extends ProxyService {
-
-    }
 }

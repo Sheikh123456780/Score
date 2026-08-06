@@ -18,7 +18,7 @@ import top.niunaijun.blackbox.utils.compat.BuildCompat;
 public class IVibratorServiceProxy extends BinderInvocationStub {
     private static String NAME;
     static {
-        if (BuildCompat.isS()) {
+        if (BuildCompat.isS_V2()) {
             NAME = "vibrator_manager";
         } else {
             NAME = Context.VIBRATOR_SERVICE;

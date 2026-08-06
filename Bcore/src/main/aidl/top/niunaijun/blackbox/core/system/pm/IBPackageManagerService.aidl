@@ -46,4 +46,7 @@ interface IBPackageManagerService {
     boolean isInstalled(String packageName, int userId);
     List<InstalledPackage> getInstalledPackagesAsUser(int userId);
     String[] getPackagesForUid(int uid, int userId);
+    boolean isAppRunning(String packageName, int userId);
+    int checkPermission(String permName, String pkgName, int userId);
+    PermissionInfo getPermissionInfo(String name, int flags);
 }

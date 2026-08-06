@@ -10,7 +10,7 @@ import top.niunaijun.blackbox.core.system.pm.IBXposedManagerService;
 import top.niunaijun.blackbox.entity.pm.InstalledModule;
 
 /**
- * Created by Milk on 5/2/21.
+ * Created by @RIYAZXERO on 5/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０

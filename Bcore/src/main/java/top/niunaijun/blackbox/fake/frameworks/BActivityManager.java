@@ -4,11 +4,14 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ProviderInfo;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 
+import black.android.app.ActivityThread;
+import black.android.app.ActivityThreadContext;
+import black.android.app.BRActivityThread;
+import black.android.app.BRActivityThreadActivityClientRecord;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.core.system.ServiceManager;
 import top.niunaijun.blackbox.core.system.am.IBActivityManagerService;
@@ -17,12 +20,13 @@ import top.niunaijun.blackbox.entity.UnbindRecord;
 import top.niunaijun.blackbox.entity.am.PendingResultData;
 import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
-import top.niunaijun.blackbox.utils.compat.BuildCompat;
-
 /**
- * Created by Milk on 4/14/21.
- * Android 16 compatible version
- * Updated for new IServiceConnection API
+ * Created by @RIYAZXERO on 3/30/21.
+ * * ∧＿∧
+ * (`･ω･∥
+ * 丶　つ０
+ * しーＪ
+ * 此处无Bug
  */
 public class BActivityManager extends BlackManager<IBActivityManagerService> {
     private static final BActivityManager sActivityManager = new BActivityManager();
@@ -97,46 +101,8 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
         return -1;
     }
 
-    /**
-     * Android 8-15 bindService
-     */
     public Intent bindService(Intent service, IBinder binder, String resolvedType, int userId) {
         try {
-            return getService().bindService(service, binder, resolvedType, userId);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    /**
-     * Android 16+ bindService with session (IBinder for AIDL compatibility)
-     */
-    public Intent bindServiceV2(Intent service, IBinder binder, String resolvedType, int userId, IBinder session) {
-        try {
-            if (BuildCompat.isAndroid16()) {
-                return getService().bindServiceV2(service, binder, resolvedType, userId, session);
-            }
-            return getService().bindService(service, binder, resolvedType, userId);
-        } catch (RemoteException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    /**
-     * Android 16+ bindService with Object session (converted to IBinder)
-     */
-    public Intent bindServiceWithSession(Intent service, IBinder binder, String resolvedType, int userId, Object session) {
-        try {
-            if (BuildCompat.isAndroid16() && session != null) {
-                // Convert Object to IBinder if possible
-                IBinder sessionBinder = null;
-                if (session instanceof IBinder) {
-                    sessionBinder = (IBinder) session;
-                }
-                return getService().bindServiceV2(service, binder, resolvedType, userId, sessionBinder);
-            }
             return getService().bindService(service, binder, resolvedType, userId);
         } catch (RemoteException e) {
             e.printStackTrace();
@@ -177,11 +143,43 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
         return null;
     }
 
+    public int checkPermission(String permission, int pid, int uid, String packageName) {
+        try {
+            return getService().checkPermission(permission,pid,uid,packageName);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
     public void onServiceDestroy(Intent proxyIntent, int userId) {
         try {
             getService().onServiceDestroy(proxyIntent, userId);
         } catch (RemoteException e) {
             e.printStackTrace();
+        }
+    }
+
+    public Activity findActivityByToken(IBinder token) {
+        Object r = BRActivityThread.get(BActivityThread.currentActivityThread()).mActivities().get(token);
+        if (r != null) {
+            return BRActivityThreadActivityClientRecord.get(token).activity();
+//            return BRActivityThread.get().ac.ActivityClientRecord.activity.get(r);
+        }
+        return null;
+    }
+
+
+    public void sendCancelActivityResult(IBinder resultTo, String resultWho, int requestCode) {
+        sendActivityResult(resultTo, resultWho, requestCode, null, 0);
+    }
+
+    public void sendActivityResult(IBinder resultTo, String resultWho, int requestCode, Intent data, int resultCode) {
+        Activity activity = findActivityByToken(resultTo);
+        if (activity != null) {
+            Object mainThread = BActivityThread.currentActivityThread();
+            BRActivityThread.get(mainThread).sendActivityResult(resultTo,resultWho,requestCode,resultCode,data);
+            //BRActivityThread.sendActivityResult.call(mainThread, resultTo, resultWho, requestCode, data, resultCode);
         }
     }
 

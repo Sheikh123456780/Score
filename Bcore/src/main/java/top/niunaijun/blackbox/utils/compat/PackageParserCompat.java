@@ -45,8 +45,7 @@ public class PackageParserCompat {
         } else if (API_LEVEL >= LOLLIPOP) {
             return BRPackageParserLollipop.getWithException(parser).parsePackage(packageFile, flags);
         } else {
-            return BRPackageParser.getWithException(parser).parsePackage(packageFile, null,
-                    new DisplayMetrics(), flags);
+            return BRPackageParser.getWithException(parser).parsePackage(packageFile, null,new DisplayMetrics(), flags);
         }
     }
 

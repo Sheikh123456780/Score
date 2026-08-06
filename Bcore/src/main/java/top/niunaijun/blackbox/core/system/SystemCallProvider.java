@@ -13,7 +13,7 @@ import top.niunaijun.blackbox.utils.Slog;
 import top.niunaijun.blackbox.utils.compat.BundleCompat;
 
 /**
- * Created by Milk on 3/31/21.
+ * Created by @RIYAZXERO on 3/31/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -40,8 +40,8 @@ public class SystemCallProvider extends ContentProvider {
         if ("VM".equals(method)) {
             Bundle bundle = new Bundle();
             if (extras != null) {
-                String name = extras.getString("_B_|_server_name_");
-                BundleCompat.putBinder(bundle, "_B_|_server_", ServiceManager.getService(name));
+                String name = extras.getString("_G_|_server_name_");
+                BundleCompat.putBinder(bundle, "_G_|_server_", ServiceManager.getService(name));
             }
             return bundle;
         }

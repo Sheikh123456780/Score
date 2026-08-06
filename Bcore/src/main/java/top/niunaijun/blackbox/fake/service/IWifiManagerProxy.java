@@ -2,6 +2,7 @@ package top.niunaijun.blackbox.fake.service;
 
 import android.content.Context;
 import android.net.wifi.WifiInfo;
+import android.os.WorkSource;
 import android.util.Log;
 
 import java.lang.reflect.Method;
@@ -13,9 +14,11 @@ import black.android.os.BRServiceManager;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
+import top.niunaijun.blackbox.utils.ArrayUtils;
+import top.niunaijun.blackbox.utils.MethodParameterUtils;
 
 /**
- * Created by Milk on 4/12/21.
+ * Created by @RIYAZXERO on 4/12/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -46,11 +49,7 @@ public class IWifiManagerProxy extends BinderInvocationStub {
 
     @ProxyMethod("getConnectionInfo")
     public static class GetConnectionInfo extends MethodHook {
-        /*
-        * It doesn't have public method to set BSSID and SSID fields in WifiInfo class,
-        * So the reflection framework invocation appeared.
-        * commented by BlackBoxing at 2022/03/08
-        * */
+    
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             WifiInfo wifiInfo = (WifiInfo) method.invoke(who, args);
@@ -61,10 +60,7 @@ public class IWifiManagerProxy extends BinderInvocationStub {
         }
 
         public static String intIP2StringIP(int ip) {
-            return (ip & 0xFF) + "." +
-                    ((ip >> 8) & 0xFF) + "." +
-                    ((ip >> 16) & 0xFF) + "." +
-                    (ip >> 24 & 0xFF);
+            return (ip & 0xFF) + "." + ((ip >> 8) & 0xFF) + "." + ((ip >> 16) & 0xFF) + "." + (ip >> 24 & 0xFF);
         }
 
         public static int ip2Int(String ipString) {

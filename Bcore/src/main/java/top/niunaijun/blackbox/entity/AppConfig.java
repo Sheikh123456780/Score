@@ -6,7 +6,7 @@ import android.os.Parcelable;
 
 
 /**
- * Created by Milk on 4/1/21.
+ * Created by @RIYAZXERO on 4/1/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -14,7 +14,7 @@ import android.os.Parcelable;
  * 此处无Bug
  */
 public class AppConfig implements Parcelable {
-    public static final String KEY = "BlackBox_client_config";
+    public static final String KEY = "RIYAZcore_client_config";
 
     public String packageName;
     public String processName;

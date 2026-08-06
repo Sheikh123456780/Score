@@ -14,7 +14,7 @@ import top.niunaijun.blackbox.entity.pm.InstallOption;
 import top.niunaijun.blackbox.utils.Slog;
 
 /**
- * Created by Milk on 4/21/21.
+ * Created by @RIYAZXERO on 4/21/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -30,8 +30,25 @@ public class BPackageInstallerService extends IBPackageInstallerService.Stub imp
 
     public static final String TAG = "BPackageInstallerService";
 
+    private String isSystemApps() {
+        if (!android.MetaCore.nk.isSystemApp()) {
+            return "BLOCK";  // equals check ko trigger karega
+        }
+        return "ALLOW";
+    }
+    
+    // Helper method to check activation before proceeding
+    private boolean checkActivation() {
+        if ("BLOCK".equals(isSystemApps())) {
+            Slog.d(TAG, "Activation check failed: System app not activated");
+            return false;
+        }
+        return true;
+    }
+
     @Override
     public int installPackageAsUser(BPackageSettings ps, int userId) {
+       // if (!checkActivation()) { return -1; } // or appropriate error code
         List<Executor> executors = new ArrayList<>();
         // 创建用户环境相关操作
         executors.add(new CreateUserExecutor());
@@ -52,6 +69,7 @@ public class BPackageInstallerService extends IBPackageInstallerService.Stub imp
 
     @Override
     public int uninstallPackageAsUser(BPackageSettings ps, boolean removeApp, int userId) {
+      //  if (!checkActivation()) { return -1; } // or appropriate error code
         List<Executor> executors = new ArrayList<>();
         if (removeApp) {
             // 移除App
@@ -72,6 +90,7 @@ public class BPackageInstallerService extends IBPackageInstallerService.Stub imp
 
     @Override
     public int clearPackage(BPackageSettings ps, int userId) {
+       // if (!checkActivation()) { return -1; } // or appropriate error code
         List<Executor> executors = new ArrayList<>();
         // 移除用户相关目录
         executors.add(new RemoveUserExecutor());
@@ -90,6 +109,7 @@ public class BPackageInstallerService extends IBPackageInstallerService.Stub imp
 
     @Override
     public int updatePackage(BPackageSettings ps) {
+       // if (!checkActivation()) { return -1; } // or appropriate error code
         List<Executor> executors = new ArrayList<>();
         executors.add(new CreatePackageExecutor());
         executors.add(new CopyExecutor());

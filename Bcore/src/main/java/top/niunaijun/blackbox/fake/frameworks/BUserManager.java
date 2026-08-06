@@ -10,7 +10,7 @@ import top.niunaijun.blackbox.core.system.user.BUserInfo;
 import top.niunaijun.blackbox.core.system.user.IBUserManagerService;
 
 /**
- * Created by Milk on 4/28/21.
+ * Created by @RIYAZXERO on 4/28/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０

@@ -10,9 +10,10 @@ import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
 import top.niunaijun.blackbox.utils.Md5Utils;
+import top.niunaijun.blackbox.utils.MethodParameterUtils;
 
 /**
- * Created by Milk on 4/3/21.
+ * Created by @RIYAZXERO on 4/3/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -44,8 +45,6 @@ public class IDeviceIdentifiersPolicyProxy extends BinderInvocationStub {
     public static class x extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-//                args[0] = BlackBoxCore.getHostPkg();
-//                return method.invoke(who, args);
             return Md5Utils.md5(BlackBoxCore.getHostPkg());
         }
     }

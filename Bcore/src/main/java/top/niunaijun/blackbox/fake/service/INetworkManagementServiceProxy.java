@@ -6,6 +6,8 @@ import java.lang.reflect.Method;
 
 import black.android.os.BRINetworkManagementServiceStub;
 import black.android.os.BRServiceManager;
+import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
@@ -46,7 +48,7 @@ public class INetworkManagementServiceProxy extends BinderInvocationStub {
     }
 
     @ProxyMethod("getNetworkStatsUidDetail")
-    public static class getNetworkStatsUidDetail extends MethodHook {
+    public static class GetNetworkStatsUidDetail extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             MethodParameterUtils.replaceFirstUid(args);
@@ -54,4 +56,5 @@ public class INetworkManagementServiceProxy extends BinderInvocationStub {
             return method.invoke(who, args);
         }
     }
+
 }

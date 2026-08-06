@@ -1,3 +1,4 @@
+// IBActivityManagerService.aidl
 package top.niunaijun.blackbox.core.system.am;
 
 import android.content.Intent;
@@ -5,12 +6,16 @@ import android.content.ComponentName;
 import android.content.pm.ServiceInfo;
 import android.content.pm.ProviderInfo;
 import android.os.IBinder;
+import java.lang.String;
+import android.app.IServiceConnection;
 import top.niunaijun.blackbox.entity.AppConfig;
 import top.niunaijun.blackbox.entity.UnbindRecord;
 import android.os.Bundle;
 import top.niunaijun.blackbox.entity.am.RunningAppProcessInfo;
 import top.niunaijun.blackbox.entity.am.PendingResultData;
 import top.niunaijun.blackbox.entity.am.RunningServiceInfo;
+
+// Declare any non-default types here with import statements
 
 interface IBActivityManagerService {
     AppConfig initProcess(String packageName, String processName, int userId);
@@ -21,14 +26,9 @@ interface IBActivityManagerService {
     int startActivities(int userId, in Intent[] intent, in String[] resolvedType, IBinder resultTo, in Bundle options);
 
     ComponentName startService(in Intent intent, String resolvedType, boolean requireForeground, int userId);
-    int stopService(in Intent intent, in String resolvedType, int userId);
+    int stopService(in Intent intent,in String resolvedType, int userId);
 
-    // Android 8-15
     Intent bindService(in Intent service, in IBinder binder, String resolvedType, int userId);
-    
-    // Android 16+ - session as IBinder for AIDL compatibility
-    Intent bindServiceV2(in Intent service, in IBinder binder, String resolvedType, int userId, in IBinder session);
-    
     void unbindService(in IBinder binder, int userId);
 
     void stopServiceToken(in ComponentName className, in IBinder token, int userId);
@@ -58,4 +58,6 @@ interface IBActivityManagerService {
     void getIntentSender(in IBinder target, String packageName, int uid, int userId);
     String getPackageForIntentSender(in IBinder target, int userId);
     int getUidForIntentSender(in IBinder target, int userId);
+
+    int checkPermission(String permission, int pid, int uid,String packageName);
 }

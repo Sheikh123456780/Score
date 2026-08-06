@@ -1,21 +1,38 @@
+// Ye alag file mein rahega - simple version
 package top.niunaijun.blackbox.core.system.api;
 
-public class MetaActivationManager {
+import android.MetaCore.RemoteManager;
+import org.lsposed.lsparanoid.Obfuscate;
 
-    private static boolean licenseActivated = false;
-    private static String licenseMessage = "";
+@Obfuscate
+public class MetaActivationManager {
     
-    public static void activateSdk(String licenseKey) {
-        LicenseVerifier.verify(licenseKey, new LicenseVerifier.Callback() {
-			@Override
-			public void onResult(boolean isValid, String message) {
-				licenseActivated = isValid;
-				licenseMessage = message;
-			}
-		});
+    /* ================= ACTIVATE SDK ================= */
+    public static void activateSdk(final String userkey) {
+        try {
+            RemoteManager.getInstance().activateSdk(userkey);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
     }
 
-    public static boolean isLicenseActivated() {
-        return licenseActivated;
+    /* ================= GET SERVER MESSAGE ================= */
+    public static String getServerMessage() {
+        try {
+            return RemoteManager.getInstance().getServerMessage();
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return "ERROR: FAILED TO GET SERVER MESSAGE";
+        }
+    }
+
+    /* ================= CHECK SDK STATUS ================= */
+    public static boolean getActivatedStatus() {
+        try {
+            return RemoteManager.getInstance().getActivatedSdk();
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

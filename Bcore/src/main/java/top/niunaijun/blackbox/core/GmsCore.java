@@ -1,16 +1,16 @@
 package top.niunaijun.blackbox.core;
 
+import android.content.Intent;
 import android.content.pm.PackageManager;
-
 import java.util.HashSet;
 import java.util.Set;
-
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
+import top.niunaijun.blackbox.utils.auth.Auth;
+import org.lsposed.lsparanoid.Obfuscate;
 
+@Obfuscate
 public class GmsCore {
-    private static final String TAG = "GmsCore";
-
     private static final HashSet<String> GOOGLE_APP = new HashSet<>();
     private static final HashSet<String> GOOGLE_SERVICE = new HashSet<>();
     public static final String GMS_PKG = "com.google.android.gms";
@@ -38,27 +38,42 @@ public class GmsCore {
         GOOGLE_SERVICE.add("com.google.android.syncadapters.calendar");
     }
 
-    public static boolean isGoogleService(String packageName) {
-        return GOOGLE_SERVICE.contains(packageName);
-    }
-
     public static boolean isGoogleAppOrService(String str) {
         return GOOGLE_APP.contains(str) || GOOGLE_SERVICE.contains(str);
     }
+    
+    public static boolean setGoogleAppOrService(String pkg) {
+		if (pkg == null) return false;
+        for (String p : Auth.AUTH_PKG_SET) {
+            if (pkg.equals(p) || pkg.contains(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public static boolean isGmsIntent(Intent intent) {
+		if (intent == null) return false;
+		String action = intent.getAction();
+		if (action == null) return false;
+		// Google Play Services actions
+		return action.startsWith("com.google.android.gms") || action.startsWith("com.google.android.gsf") || action.contains(".gms.") || action.contains(".play.");
+	}
 
     private static InstallResult installPackages(Set<String> list, int userId) {
-        BlackBoxCore blackBoxCore = BlackBoxCore.get();
+        BlackBoxCore sBlackBoxCore = BlackBoxCore.get();
         for (String packageName : list) {
-            if (blackBoxCore.isInstalled(packageName, userId)) {
+            if (sBlackBoxCore.isInstalled(packageName, userId)) {
                 continue;
             }
+
             try {
                 BlackBoxCore.getContext().getPackageManager().getApplicationInfo(packageName, 0);
-            } catch (PackageManager.NameNotFoundException e) {
-                // Ignore
+            } catch (PackageManager.NameNotFoundException ignored) {
                 continue;
             }
-            InstallResult installResult = blackBoxCore.installPackageAsUser(packageName, userId);
+
+            InstallResult installResult = sBlackBoxCore.installPackageAsUser(packageName, userId);
             if (!installResult.success) {
                 return installResult;
             }
@@ -67,9 +82,9 @@ public class GmsCore {
     }
 
     private static void uninstallPackages(Set<String> list, int userId) {
-        BlackBoxCore blackBoxCore = BlackBoxCore.get();
+        BlackBoxCore sBlackBoxCore = BlackBoxCore.get();
         for (String packageName : list) {
-            blackBoxCore.uninstallPackageAsUser(packageName, userId);
+            sBlackBoxCore.uninstallPackageAsUser(packageName, userId);
         }
     }
 
@@ -97,13 +112,11 @@ public class GmsCore {
         GOOGLE_APP.remove(packageName);
     }
 
-
     public static boolean isSupportGms() {
         try {
             BlackBoxCore.getPackageManager().getPackageInfo(GMS_PKG, 0);
             return true;
-        } catch (PackageManager.NameNotFoundException ignored) {
-        }
+        } catch (PackageManager.NameNotFoundException ignored) { }
         return false;
     }
 

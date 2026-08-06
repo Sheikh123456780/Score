@@ -1,22 +1,22 @@
 package top.niunaijun.blackbox.fake.service.context.providers;
 
+import android.os.Build;
+import android.os.Bundle;
 import android.os.IInterface;
+import android.util.Log;
 
+import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.utils.compat.ContextCompat;
 import java.lang.reflect.Method;
 
 import black.android.content.BRAttributionSource;
-import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.fake.hook.ClassInvocationStub;
-import top.niunaijun.blackbox.utils.compat.ContextCompat;
 
 /**
- * Created by Milk on 4/8/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * HARD FINAL FIX
+ * Android 10 → 16
+ * Solves AttributionSource.enforceCallingUid crash
  */
 public class ContentProviderStub extends ClassInvocationStub implements BContentProvider {
     public static final String TAG = "ContentProviderStub";

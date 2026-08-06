@@ -15,7 +15,7 @@ public class DrawableUtils {
             return ((BitmapDrawable) drawable).getBitmap();
 
         Bitmap.Config config = drawable.getOpacity() != PixelFormat.OPAQUE ?
-        Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
+                Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
 
         Bitmap bitmap = Bitmap.createBitmap(width, height, config);
         Canvas canvas = new Canvas(bitmap);

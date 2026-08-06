@@ -1,6 +1,5 @@
 package top.niunaijun.blackbox.utils.compat;
 
-
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.WallpaperManager;
@@ -19,47 +18,50 @@ import black.com.android.internal.BRRstyleable;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.utils.DrawableUtils;
 
-/**
- * Created by Milk on 3/31/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class ActivityCompat {
 
     public static void fix(Activity activity) {
-        // mContentResolver
-        BRActivity.get(activity).mActivityInfo();
+        try {
+            // Custom BlackBox proxy call
+            BRActivity.get(activity).mActivityInfo();
+        } catch (Throwable ignore) {
+        }
 
         Context baseContext = activity.getBaseContext();
+
+        // Apply style flags: wallpaper, fullscreen
         try {
-            TypedArray typedArray = activity.obtainStyledAttributes((BRRstyleable.get().Window()));
+            TypedArray typedArray = activity.obtainStyledAttributes(BRRstyleable.get().Window());
             if (typedArray != null) {
-                boolean showWallpaper = typedArray.getBoolean(BRRstyleable.get().Window_windowShowWallpaper(),
-                        false);
-                if (showWallpaper) {
-                    activity.getWindow().setBackgroundDrawable(WallpaperManager.getInstance(activity).getDrawable());
+                if (typedArray.getBoolean(BRRstyleable.get().Window_windowShowWallpaper(), false)) {
+                    try {
+                        Drawable wallpaper = WallpaperManager.getInstance(activity).getDrawable();
+                        if (wallpaper != null) {
+                            activity.getWindow().setBackgroundDrawable(wallpaper);
+                        }
+                    } catch (Throwable ignore) {
+                    }
                 }
-                boolean fullscreen = typedArray.getBoolean(BRRstyleable.get().Window_windowFullscreen(), false);
-                if (fullscreen) {
+
+                if (typedArray.getBoolean(BRRstyleable.get().Window_windowFullscreen(), false)) {
                     activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                 }
+
                 typedArray.recycle();
             }
         } catch (Throwable e) {
             e.printStackTrace();
         }
 
+        // Task description (label + icon)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Intent intent = activity.getIntent();
-            ApplicationInfo applicationInfo = baseContext.getApplicationInfo();
-            PackageManager pm = activity.getPackageManager();
-            if (intent != null && activity.isTaskRoot()) {
-                try {
-                    String label = TaskDescriptionCompat.getTaskDescriptionLabel(
-                            BActivityThread.getUserId(), applicationInfo.loadLabel(pm));
+            try {
+                Intent intent = activity.getIntent();
+                ApplicationInfo appInfo = baseContext.getApplicationInfo();
+                PackageManager pm = activity.getPackageManager();
+
+                if (intent != null && activity.isTaskRoot()) {
+                    String label = TaskDescriptionCompat.getTaskDescriptionLabel(BActivityThread.getUserId(), appInfo.loadLabel(pm));
 
                     Bitmap icon = null;
                     Drawable drawable = getActivityIcon(activity);
@@ -70,23 +72,27 @@ public class ActivityCompat {
                     }
 
                     activity.setTaskDescription(new ActivityManager.TaskDescription(label, icon));
-                } catch (Throwable e) {
-                    e.printStackTrace();
                 }
+            } catch (Throwable e) {
+                e.printStackTrace();
             }
         }
     }
 
     private static Drawable getActivityIcon(Activity activity) {
-        PackageManager pm = activity.getPackageManager();
         try {
+            PackageManager pm = activity.getPackageManager();
             Drawable icon = pm.getActivityIcon(activity.getComponentName());
-            if (icon != null)
-                return icon;
+            if (icon != null) return icon;
         } catch (PackageManager.NameNotFoundException ignore) {
         }
 
-        ApplicationInfo applicationInfo = activity.getApplicationInfo();
-        return applicationInfo.loadIcon(pm);
+        try {
+            ApplicationInfo appInfo = activity.getApplicationInfo();
+            return appInfo.loadIcon(activity.getPackageManager());
+        } catch (Throwable ignore) {
+        }
+
+        return null;
     }
 }

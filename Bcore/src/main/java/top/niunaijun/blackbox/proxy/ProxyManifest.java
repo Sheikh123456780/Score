@@ -1,26 +1,18 @@
 package top.niunaijun.blackbox.proxy;
 
 import java.util.Locale;
-
 import top.niunaijun.blackbox.BlackBoxCore;
 
-/**
- * Created by Milk on 4/1/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class ProxyManifest {
     public static final int FREE_COUNT = 50;
+    public static final String PROXY_PACKAGE_NAME = "top.niunaijun.blackbox";
 
     public static boolean isProxy(String msg) {
         return getBindProvider().equals(msg) || msg.contains("proxy_content_provider_");
     }
 
     public static String getBindProvider() {
-        return BlackBoxCore.getHostPkg() + ".blackbox.SystemCallProvider";
+        return BlackBoxCore.getHostPkg() + ".SystemCallProvider";
     }
 
     public static String getProxyAuthorities(int index) {
@@ -28,27 +20,27 @@ public class ProxyManifest {
     }
 
     public static String getProxyPendingActivity(int index) {
-        return String.format(Locale.CHINA, "top.niunaijun.blackbox.proxy.ProxyPendingActivity$P%d", index);
+        return String.format(Locale.CHINA, PROXY_PACKAGE_NAME + ".proxy.ProxyPendingActivity$P%d", index);
     }
 
     public static String getProxyActivity(int index) {
-        return String.format(Locale.CHINA, "top.niunaijun.blackbox.proxy.ProxyActivity$P%d", index);
+        return String.format(Locale.CHINA, PROXY_PACKAGE_NAME + ".proxy.ProxyActivity$P%d", index);
     }
 
     public static String TransparentProxyActivity(int index) {
-        return String.format(Locale.CHINA, "top.niunaijun.blackbox.proxy.TransparentProxyActivity$P%d", index);
+        return String.format(Locale.CHINA, PROXY_PACKAGE_NAME + ".proxy.TransparentProxyActivity$P%d", index);
     }
 
     public static String getProxyService(int index) {
-        return String.format(Locale.CHINA, "top.niunaijun.blackbox.proxy.ProxyService$P%d", index);
+        return String.format(Locale.CHINA, PROXY_PACKAGE_NAME + ".proxy.ProxyService$P%d", index);
     }
 
     public static String getProxyJobService(int index) {
-        return String.format(Locale.CHINA, "top.niunaijun.blackbox.proxy.ProxyJobService$P%d", index);
+        return String.format(Locale.CHINA, PROXY_PACKAGE_NAME + ".proxy.ProxyJobService$P%d", index);
     }
 
     public static String getProxyFileProvider() {
-        return BlackBoxCore.getHostPkg() + ".blackbox.FileProvider";
+        return BlackBoxCore.getHostPkg() + ".FileProvider";
     }
 
     public static String getProxyReceiver() {

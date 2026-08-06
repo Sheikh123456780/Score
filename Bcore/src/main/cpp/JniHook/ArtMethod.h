@@ -1,15 +1,28 @@
 //
-// Created by Milk on 3/7/21.
+// Created by efrit on 2026/6/24
+// Updated for Android 16 compatibility
 //
 #include <stdio.h>
 
-#ifndef ARTHOOK_ART_METHOD_H
-#define ARTHOOK_ART_METHOD_H
+#ifndef VIRTUAL_APP_ARTMETHOD_H
+#define VIRTUAL_APP_ARTMETHOD_H
 
-#define __ANDROID_API_U__ 34
-#define __ANDROID_API_R__ 30
-#define __ANDROID_API_Q__ 29
-#define __ANDROID_API_P__ 28
+#define __ANDROID_API_L__       21
+#define __ANDROID_API_L_MR1__   22
+#define __ANDROID_API_M__       23
+#define __ANDROID_API_N__       24
+#define __ANDROID_API_N_MR1__   25
+#define __ANDROID_API_O__       26
+#define __ANDROID_API_O_MR1__   27
+#define __ANDROID_API_P__       28
+#define __ANDROID_API_Q__       29
+#define __ANDROID_API_R__       30
+#define __ANDROID_API_S__       31
+#define __ANDROID_API_S_V2__    32
+#define __ANDROID_API_Tiramisu__ 33
+#define __ANDROID_API_U__       34
+#define __ANDROID_API_V__       35
+#define __ANDROID_API_16__      36  // Android 16
 
 static constexpr uint32_t kAccPublic =       0x0001;  // class, field, method, ic
 static constexpr uint32_t kAccPrivate =      0x0002;  // field, method, ic
@@ -30,15 +43,16 @@ static constexpr uint32_t kAccSynthetic =    0x1000;  // class, field, method, i
 static constexpr uint32_t kAccAnnotation =   0x2000;  // class, ic (1.5)
 static constexpr uint32_t kAccEnum =         0x4000;  // class, field, ic (1.5)
 
+// Native method flags
+static constexpr uint32_t kAccFastNative =            0x00080000;  // method (runtime; native only)
+static constexpr uint32_t kAccCriticalNative =        0x00100000;  // method (runtime; native only)
+static constexpr uint32_t kAccNterpInvokeFastPathFlag = 0x00200000;  // method (runtime)
+
+// Visibility flags for hidden API access
 static constexpr uint32_t kAccPublicApi =             0x10000000;  // field, method
 static constexpr uint32_t kAccCorePlatformApi =       0x20000000;  // field, method
 
-// Native method flags are set when linking the methods based on the presence of the
-// @dalvik.annotation.optimization.{Fast,Critical}Native annotations with build visibility.
-// Reuse the values of kAccSkipAccessChecks and kAccMiranda which are not used for native methods.
-static constexpr uint32_t kAccFastNative =            0x00080000;  // method (runtime; native only)
-static constexpr uint32_t kAccCriticalNative =        0x00100000;  // method (runtime; native only)
+// Additional flags for newer Android versions
+static constexpr uint32_t kAccNativeRuntime =         0x00000000;  // Placeholder for runtime-specific flags
 
-static constexpr uint32_t kAccNterpInvokeFastPathFlag     = 0x00200000;  // method (runtime)
-
-#endif //ARTHOOK_ART_METHOD_H
+#endif //VIRTUAL_APP_ARTMETHOD_H

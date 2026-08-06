@@ -221,6 +221,28 @@ public class FileUtils {
             }
         }
     }
+    
+    public static boolean copylibry(String srcPath, String destPath) {
+        File src = new File(srcPath);
+        File dest = new File(destPath);
+
+        if (!src.exists()) return false;
+
+        try (FileInputStream is = new FileInputStream(src);
+             FileOutputStream os = new FileOutputStream(dest)) {
+
+            byte[] buffer = new byte[4096];
+            int length;
+            while ((length = is.read(buffer)) > 0) {
+                os.write(buffer, 0, length);
+            }
+
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 
     public static void copyFile(InputStream inputStream, File target) {
         FileOutputStream outputStream = null;
@@ -357,10 +379,7 @@ public class FileUtils {
         int MODE_IROTH = 00004;
         int MODE_IWOTH = 00002;
         int MODE_IXOTH = 00001;
-
-        int MODE_755 = MODE_IRUSR | MODE_IWUSR | MODE_IXUSR
-                | MODE_IRGRP | MODE_IXGRP
-                | MODE_IROTH | MODE_IXOTH;
+        int MODE_755 = MODE_IRUSR | MODE_IWUSR | MODE_IXUSR | MODE_IRGRP | MODE_IXGRP | MODE_IROTH | MODE_IXOTH;
     }
 
     /**
@@ -377,8 +396,7 @@ public class FileUtils {
             return singleton;
         }
 
-        private int RefCntInc(String filePath, java.nio.channels.FileLock fileLock, RandomAccessFile randomAccessFile,
-                              FileChannel fileChannel) {
+        private int RefCntInc(String filePath, java.nio.channels.FileLock fileLock, RandomAccessFile randomAccessFile, FileChannel fileChannel) {
             int refCount;
             if (this.mRefCountMap.containsKey(filePath)) {
                 FileLockCount fileLockCount = this.mRefCountMap.get(filePath);
@@ -470,8 +488,7 @@ public class FileUtils {
             java.nio.channels.FileLock mFileLock;
             int mRefCount;
 
-            FileLockCount(java.nio.channels.FileLock fileLock, int mRefCount, RandomAccessFile fOs,
-                          FileChannel fChannel) {
+            FileLockCount(java.nio.channels.FileLock fileLock, int mRefCount, RandomAccessFile fOs,FileChannel fChannel) {
                 this.mFileLock = fileLock;
                 this.mRefCount = mRefCount;
                 this.fOs = fOs;

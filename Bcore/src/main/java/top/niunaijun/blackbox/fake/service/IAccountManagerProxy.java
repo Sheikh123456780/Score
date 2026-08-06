@@ -10,6 +10,7 @@ import java.util.Map;
 
 import black.android.accounts.BRIAccountManagerStub;
 import black.android.os.BRServiceManager;
+import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.fake.frameworks.BAccountManager;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
@@ -17,7 +18,7 @@ import top.niunaijun.blackbox.fake.hook.ProxyMethod;
 import top.niunaijun.blackbox.utils.Slog;
 
 /**
- * Created by Milk on 2022/2/14.
+ * Created by @RIYAZXERO on 2022/2/14.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -243,12 +244,7 @@ public class IAccountManagerProxy extends BinderInvocationStub {
 
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            BAccountManager.get().getAuthToken((IAccountManagerResponse) args[0],
-                    (Account) args[1],
-                    (String) args[2],
-                    (boolean) args[3],
-                    (boolean) args[4],
-                    (Bundle) args[5]);
+            BAccountManager.get().getAuthToken((IAccountManagerResponse) args[0],(Account) args[1],(String) args[2],(boolean) args[3],(boolean) args[4],(Bundle) args[5]);
             return 0;
         }
     }

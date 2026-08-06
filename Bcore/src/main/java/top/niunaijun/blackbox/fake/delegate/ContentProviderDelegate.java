@@ -25,7 +25,7 @@ import top.niunaijun.blackbox.fake.service.context.providers.SystemProviderStub;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
- * Created by Milk on 3/31/21.
+ * Created by @RIYAZXERO on 3/31/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -48,13 +48,7 @@ public class ContentProviderDelegate {
             return;
         IInterface bContentProvider;
         switch (auth) {
-            case "media":
-            case "telephony":
             case "settings":
-                case "downloads":
-case "documents":
-case "externalstorage":
-case "media.documents":
                 bContentProvider = new SystemProviderStub().wrapper(iInterface, BlackBoxCore.getHostPkg());
                 break;
             default:
@@ -70,7 +64,7 @@ case "media.documents":
 
     public static void init() {
         clearSettingProvider();
-sInjected.clear();
+
         BlackBoxCore.getContext().getContentResolver().call(Uri.parse("content://settings"), "", null, null);
         Object activityThread = BlackBoxCore.mainThread();
         ArrayMap<Object, Object> map = (ArrayMap<Object, Object>) BRActivityThread.get(activityThread).mProviderMap();
@@ -100,7 +94,7 @@ sInjected.clear();
         if (cache != null) {
             clearContentProvider(cache);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && BRSettingsGlobal.getRealClass() != null) {
+        if (BRSettingsGlobal.getRealClass() != null) {
             cache = BRSettingsGlobal.get().sNameValueCache();
             if (cache != null) {
                 clearContentProvider(cache);

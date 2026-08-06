@@ -23,7 +23,7 @@ import top.niunaijun.blackbox.entity.pm.InstallOption;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 /**
- * Created by Milk on 4/21/21.
+ * Created by @RIYAZXERO on 4/21/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０

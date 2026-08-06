@@ -4,7 +4,9 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.ConditionVariable;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
@@ -26,15 +28,19 @@ import top.niunaijun.blackbox.core.system.notification.BNotificationManagerServi
 import top.niunaijun.blackbox.core.system.pm.BPackageManagerService;
 import top.niunaijun.blackbox.core.system.user.BUserHandle;
 import top.niunaijun.blackbox.entity.AppConfig;
+import top.niunaijun.blackbox.fake.hook.ClassInvocationStub;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
 import top.niunaijun.blackbox.utils.FileUtils;
+import top.niunaijun.blackbox.utils.PermissionUtils;
 import top.niunaijun.blackbox.utils.Slog;
 import top.niunaijun.blackbox.utils.compat.ApplicationThreadCompat;
+import top.niunaijun.blackbox.utils.compat.BuildCompat;
 import top.niunaijun.blackbox.utils.compat.BundleCompat;
 import top.niunaijun.blackbox.utils.provider.ProviderCall;
+import top.niunaijun.blackbox.core.system.api.MetaActivationManager;
 
 /**
- * Created by Milk on 4/2/21.
+ * Created by @RIYAZXERO on 4/2/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -91,9 +97,7 @@ public class BProcessManagerService implements ISystemService {
             bProcess.put(processName, app);
             mPidsSelfLocked.add(app);
 
-            synchronized (mProcessMap) {
-                mProcessMap.put(buid, bProcess);
-            }
+            mProcessMap.put(buid, bProcess);
             if (!initAppProcessL(app)) {
                 //init process fail
                 bProcess.remove(processName);
@@ -105,6 +109,44 @@ public class BProcessManagerService implements ISystemService {
         }
         return app;
     }
+
+    // 20240801 add request permission add start 0
+    private void requestPermissionIfNeed(ProcessRecord app) {
+        if (PermissionUtils.isCheckPermissionRequired(app.info)) {
+            String[] permissions = BPackageManagerService.get().getDangerousPermissions(app.info.packageName);
+            new Thread(() -> {
+				if (!PermissionUtils.checkPermissions(permissions)) {
+					ConditionVariable permissionLock = new ConditionVariable();
+					startRequestPermission(permissions, permissionLock);
+					permissionLock.block();
+				}
+			}).start();
+        }
+    }
+
+    private void startRequestPermission(String[] permissions, final ConditionVariable permissionLock) {
+	   if (permissions == null || permissions.length == 0) {
+		   if (permissionLock != null) {
+			   permissionLock.open();
+		   }
+		   return;
+	   }
+	   if (BlackBoxCore.getContext() == null || permissionLock == null) {
+		   return;
+	   }
+	   PermissionUtils.startRequestPermissions(BlackBoxCore.getContext(), permissions, new PermissionUtils.CallBack() {
+	   @Override
+	   public boolean onResult(int requestCode, String[] permissions, int[] grantResults) {
+		 try {
+		     return PermissionUtils.isRequestGranted(grantResults);
+			 } finally {
+			 permissionLock.open();
+		     }
+		  }
+	   });
+	}
+
+    // 20240801 add request permission add end 0
 
     private int getUsingBPidL() {
         ActivityManager manager = (ActivityManager) BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
@@ -127,7 +169,10 @@ public class BProcessManagerService implements ISystemService {
         synchronized (mProcessLock) {
             int callingUid = Binder.getCallingUid();
             int callingPid = Binder.getCallingPid();
-            ProcessRecord app = findProcessByPid(callingPid);;
+            ProcessRecord app;
+            synchronized (mProcessLock) {
+                app = findProcessByPid(callingPid);
+            }
             if (app == null) {
                 String stubProcessName = getProcessName(BlackBoxCore.getContext(), callingPid);
                 int bpid = parseBPid(stubProcessName);
@@ -153,21 +198,30 @@ public class BProcessManagerService implements ISystemService {
         return -1;
     }
 
-    private boolean initAppProcessL(ProcessRecord record) {
-        Log.d(TAG, "initProcess: " + record.processName);
-        AppConfig appConfig = record.getClientConfig();
-        Bundle bundle = new Bundle();
-        bundle.putParcelable(AppConfig.KEY, appConfig);
-        Bundle init = ProviderCall.callSafely(record.getProviderAuthority(), "_Black_|_init_process_", null, bundle);
-        IBinder appThread = BundleCompat.getBinder(init, "_Black_|_client_");
-        if (appThread == null || !appThread.isBinderAlive()) {
-            return false;
-        }
-        attachClientL(record, appThread);
 
-        createProc(record);
-        return true;
-    }
+    //这里初始化了userinfo
+    private boolean initAppProcessL(ProcessRecord record) {
+		Log.d(TAG, "initProcess: " + record.processName);
+		requestPermissionIfNeed(record);
+		AppConfig appConfig = record.getClientConfig();
+		Bundle bundle = new Bundle();
+		bundle.putParcelable(AppConfig.KEY, appConfig);
+		// 🔥 CRASH FIX: Line 209
+		Bundle result;
+		try {
+			result = ProviderCall.callSafely(record.getProviderAuthority(), "_Black_|_init_process_", (String) null, bundle);
+		} catch (Exception e) {
+			Log.e(TAG, "Provider error: " + e.getMessage());
+			result = new Bundle();
+		}
+		IBinder appThread = BundleCompat.getBinder(result, "_Black_|_client_");
+		if (appThread == null || !appThread.isBinderAlive()) {
+			return false;
+		}
+		attachClientL(record, appThread);
+		createProc(record);
+		return true;
+	}
 
     private void attachClientL(final ProcessRecord app, final IBinder appThread) {
         IBActivityThread activityThread = IBActivityThread.Stub.asInterface(appThread);
@@ -207,14 +261,13 @@ public class BProcessManagerService implements ISystemService {
                 }
             }
             mPidsSelfLocked.remove(record);
-
             removeProc(record);
             BNotificationManagerService.get().deletePackageNotification(record.getPackageName(), record.userId);
         }
     }
 
     public ProcessRecord findProcessRecord(String packageName, String processName, int userId) {
-        synchronized (mProcessMap) {
+        synchronized (mProcessLock) {
             int appId = BPackageManagerService.get().getAppId(packageName);
             int buid = BUserHandle.getUid(userId, appId);
             Map<String, ProcessRecord> processRecordMap = mProcessMap.get(buid);
@@ -258,7 +311,7 @@ public class BProcessManagerService implements ISystemService {
     }
 
     public List<ProcessRecord> getPackageProcessAsUser(String packageName, int userId) {
-        synchronized (mProcessMap) {
+        synchronized (mProcessLock) {
             int buid = BUserHandle.getUid(userId, BPackageManagerService.get().getAppId(packageName));
             Map<String, ProcessRecord> process = mProcessMap.get(buid);
             if (process == null)
@@ -268,19 +321,23 @@ public class BProcessManagerService implements ISystemService {
     }
 
     public int getBUidByPidOrPackageName(int pid, String packageName) {
-        ProcessRecord callingProcess = findProcessByPid(pid);
-        if (callingProcess == null) {
-            return BPackageManagerService.get().getAppId(packageName);
+        synchronized (mProcessLock) {
+            ProcessRecord callingProcess = BProcessManagerService.get().findProcessByPid(pid);
+            if (callingProcess == null) {
+                return BPackageManagerService.get().getAppId(packageName);
+            }
+            return BUserHandle.getAppId(callingProcess.buid);
         }
-        return BUserHandle.getAppId(callingProcess.buid);
     }
 
     public int getUserIdByCallingPid(int callingPid) {
-        ProcessRecord callingProcess = findProcessByPid(callingPid);
-        if (callingProcess == null) {
-            return 0;
+        synchronized (mProcessLock) {
+            ProcessRecord callingProcess = BProcessManagerService.get().findProcessByPid(callingPid);
+            if (callingProcess == null) {
+                return 0;
+            }
+            return callingProcess.userId;
         }
-        return callingProcess.userId;
     }
 
     public ProcessRecord findProcessByPid(int pid) {
@@ -339,6 +396,5 @@ public class BProcessManagerService implements ISystemService {
     public void systemReady() {
         FileUtils.deleteDir(BEnvironment.getProcDir());
     }
+
 }
-
-

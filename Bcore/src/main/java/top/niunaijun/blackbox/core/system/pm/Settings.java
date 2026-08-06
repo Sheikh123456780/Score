@@ -32,7 +32,7 @@ import top.niunaijun.blackbox.utils.compat.PackageParserCompat;
  * しーＪ
  * 此处无Bug
  */
-/*public*/ class Settings {
+/*public*/ class Settings { // 等同于 PackageCacheManager
     public static final String TAG = "Settings";
 
     final ArrayMap<String, BPackageSettings> mPackages = new ArrayMap<>();
@@ -196,7 +196,7 @@ import top.niunaijun.blackbox.utils.compat.PackageParserCompat;
             BPackageSettings bPackageSettings = new BPackageSettings(packageSettingsIn);
             bPackageSettings.pkg.mExtras = bPackageSettings;
             if (bPackageSettings.installOption.isFlag(InstallOption.FLAG_SYSTEM)) {
-                PackageInfo packageInfo = BlackBoxCore.getPackageManager().getPackageInfo(packageName, PackageManager.GET_META_DATA);
+                PackageInfo packageInfo = BlackBoxCore.getPackageManager().getPackageInfo(packageName, FileUtils.FileMode.MODE_IWUSR);
                 String currPackageSourcePath = packageInfo.applicationInfo.sourceDir;
                 if (!currPackageSourcePath.equals(bPackageSettings.pkg.baseCodePath)) {
                     // update baseCodePath And Re install
@@ -209,6 +209,9 @@ import top.niunaijun.blackbox.utils.compat.PackageParserCompat;
             }
             bPackageSettings.save();
             mPackages.put(bPackageSettings.pkg.packageName, bPackageSettings);
+            // 20240801 add request permission add start 0
+            BPackageManagerService.get().analyzePackageLocked(bPackageSettings);
+            // 20240801 add request permission add end 0
             Slog.d(TAG, "loaded Package: " + packageName);
         } catch (Throwable e) {
             e.printStackTrace();

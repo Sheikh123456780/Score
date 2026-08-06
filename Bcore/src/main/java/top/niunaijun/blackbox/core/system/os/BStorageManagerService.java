@@ -17,14 +17,7 @@ import top.niunaijun.blackbox.fake.provider.FileProvider;
 import top.niunaijun.blackbox.proxy.ProxyManifest;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
-/**
- * Created by Milk on 4/10/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
+
 public class BStorageManagerService extends IBStorageManagerService.Stub implements ISystemService {
     private static final BStorageManagerService sService = new BStorageManagerService();
 
@@ -41,14 +34,13 @@ public class BStorageManagerService extends IBStorageManagerService.Stub impleme
             return null;
         }
         try {
-            StorageVolume[] storageVolumes =
-        BRStorageManager.get().getVolumeList(uid, flags);
+            StorageVolume[] storageVolumes = BRStorageManager.get().getVolumeList(BUserHandle.getUserId(Process.myUid()), 0);
             if (storageVolumes == null)
                 return null;
             for (StorageVolume storageVolume : storageVolumes) {
-                BRStorageVolume.get(storageVolume)._set_mPath(BEnvironment.getExternalUserDir(userId));
+                BRStorageVolume.get(storageVolume)._set_mPath(BEnvironment.getExternalStorageDirectory());
                 if (BuildCompat.isPie()) {
-                    BRStorageVolume.get(storageVolume)._set_mInternalPath(BEnvironment.getExternalUserDir(userId));
+                    BRStorageVolume.get(storageVolume)._set_mInternalPath(BEnvironment.getExternalStorageDirectory());
                 }
             }
             return storageVolumes;

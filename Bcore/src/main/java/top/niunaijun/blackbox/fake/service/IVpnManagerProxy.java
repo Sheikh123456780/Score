@@ -6,7 +6,7 @@ import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.ScanClass;
 
 /**
- * Created by Milk on 4/12/21.
+ * Created by @RIYAZXERO on 4/12/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０

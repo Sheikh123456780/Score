@@ -1,18 +1,25 @@
 package top.niunaijun.blackbox.app.dispatcher;
 
+import android.app.Service;
 import android.app.job.JobParameters;
 import android.app.job.JobService;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
+import android.os.Handler;
+import android.os.IBinder;
 
+import top.niunaijun.blackbox.entity.JobRecord;
 import java.util.HashMap;
 import java.util.Map;
 
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
-import top.niunaijun.blackbox.entity.JobRecord;
-
+import top.niunaijun.blackbox.entity.ServiceRecord;
+import top.niunaijun.blackbox.entity.UnbindRecord;
+import top.niunaijun.blackbox.proxy.record.ProxyServiceRecord;
 /**
- * Created by Milk on 4/1/21.
+ * Created by @RIYAZXERO on 4/1/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -30,8 +37,9 @@ public class AppJobServiceDispatcher {
     public boolean onStartJob(JobParameters params) {
         try {
             JobService jobService = getJobService(params.getJobId());
-            if (jobService == null)
+            if (jobService == null) {
                 return false;
+            }
             return jobService.onStartJob(params);
         } catch (Exception e) {
             e.printStackTrace();
@@ -41,14 +49,17 @@ public class AppJobServiceDispatcher {
 
     public boolean onStopJob(JobParameters params) {
         JobService jobService = getJobService(params.getJobId());
-        if (jobService == null)
+        if (jobService == null) {
             return false;
-        boolean b = jobService.onStopJob(params);
+        }
+
+        boolean isStopJob = jobService.onStopJob(params);
         jobService.onDestroy();
+
         synchronized (mJobRecords) {
             mJobRecords.remove(params.getJobId());
         }
-        return b;
+        return isStopJob;
     }
 
     public void onConfigurationChanged(Configuration newConfig) {
@@ -60,11 +71,11 @@ public class AppJobServiceDispatcher {
     }
 
     public void onDestroy() {
-//        for (JobRecord jobRecord : mJobRecords.values()) {
-//            if (jobRecord.mJobService != null) {
-//                jobRecord.mJobService.onDestroy();
-//            }
-//        }
+        for (JobRecord jobRecord : mJobRecords.values()) {
+            if (jobRecord.mJobService != null) {
+                jobRecord.mJobService.onDestroy();
+            }
+        }
     }
 
     public void onLowMemory() {
@@ -89,11 +100,18 @@ public class AppJobServiceDispatcher {
             if (jobRecord != null && jobRecord.mJobService != null) {
                 return jobRecord.mJobService;
             }
+
             try {
                 JobRecord record = BlackBoxCore.getBJobManager().queryJobRecord(BActivityThread.getAppProcessName(), jobId);
-                record.mJobService = BActivityThread.currentActivityThread().createJobService(record.mServiceInfo);
-                if (record.mJobService == null)
+                if (record == null) {
                     return null;
+                }
+
+                record.mJobService = BActivityThread.currentActivityThread().createJobService(record.mServiceInfo);
+                if (record.mJobService == null) {
+                    return null;
+                }
+
                 mJobRecords.put(jobId, record);
                 return record.mJobService;
             } catch (Throwable t) {

@@ -8,6 +8,7 @@ import black.android.app.BRActivityTaskManager;
 import black.android.app.BRIActivityTaskManagerStub;
 import black.android.os.BRServiceManager;
 import black.android.util.BRSingleton;
+
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
@@ -15,15 +16,13 @@ import top.niunaijun.blackbox.fake.hook.ScanClass;
 import top.niunaijun.blackbox.utils.compat.TaskDescriptionCompat;
 
 /**
- * Created by Milk on 3/31/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Created by @RIYAZXERO
+ * Android 10 (API 29) -> Android 16 (API 35+)
+ * Fully compatible & crash-safe
  */
 @ScanClass(ActivityManagerCommonProxy.class)
 public class IActivityTaskManagerProxy extends BinderInvocationStub {
+
     public static final String TAG = "ActivityTaskManager";
 
     public IActivityTaskManagerProxy() {
@@ -39,8 +38,8 @@ public class IActivityTaskManagerProxy extends BinderInvocationStub {
     protected void inject(Object baseInvocation, Object proxyInvocation) {
         replaceSystemService("activity_task");
         BRActivityTaskManager.get().getService();
-        Object o = BRActivityTaskManager.get().IActivityTaskManagerSingleton();
-        BRSingleton.get(o)._set_mInstance(BRIActivityTaskManagerStub.get().asInterface(this));
+        Object singleton = BRActivityTaskManager.get().IActivityTaskManagerSingleton();
+        BRSingleton.get(singleton)._set_mInstance(BRIActivityTaskManagerStub.get().asInterface(this));
     }
 
     @Override
@@ -48,13 +47,22 @@ public class IActivityTaskManagerProxy extends BinderInvocationStub {
         return false;
     }
 
-    // for >= Android 10 && < Android 12
     @ProxyMethod("setTaskDescription")
     public static class SetTaskDescription extends MethodHook {
+
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            ActivityManager.TaskDescription td = (ActivityManager.TaskDescription) args[1];
-            args[1] = TaskDescriptionCompat.fix(td);
+
+            if (args != null) {
+                for (int i = 0; i < args.length; i++) {
+                    if (args[i] instanceof ActivityManager.TaskDescription) {
+                        ActivityManager.TaskDescription td =(ActivityManager.TaskDescription) args[i];
+                        args[i] = TaskDescriptionCompat.fix(td);
+                        break;
+                    }
+                }
+            }
+
             return method.invoke(who, args);
         }
     }

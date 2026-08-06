@@ -14,14 +14,6 @@ import black.android.content.BRIIntentReceiver;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.proxy.record.ProxyBroadcastRecord;
 
-/**
- * Created by Milk on 4/2/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class InnerReceiverDelegate extends IIntentReceiver.Stub {
     public static final String TAG = "InnerReceiverDelegate";
 

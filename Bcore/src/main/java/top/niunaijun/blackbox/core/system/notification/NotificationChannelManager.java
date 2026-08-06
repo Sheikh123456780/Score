@@ -12,7 +12,7 @@ import androidx.annotation.RequiresApi;
 import top.niunaijun.blackbox.BlackBoxCore;
 
 /**
- * Created by BlackBox on 2022/3/18.
+ * Created by BlackBox on 2026/3/06.
  */
 public class NotificationChannelManager {
     private final static NotificationChannelManager sManager = new NotificationChannelManager();
@@ -33,9 +33,8 @@ public class NotificationChannelManager {
     private void registerAppChannel() {
         NotificationManager nm = (NotificationManager) BlackBoxCore.getContext().getSystemService(Context.NOTIFICATION_SERVICE);
         String CHANNEL_ONE_ID = BlackBoxCore.getContext().getPackageName();
-        String CHANNEL_ONE_NAME = "black-box-app";
-        APP_CHANNEL = new NotificationChannel(CHANNEL_ONE_ID,
-                CHANNEL_ONE_NAME, NotificationManager.IMPORTANCE_HIGH);
+        String CHANNEL_ONE_NAME = "RIYAZ-Box-App";
+        APP_CHANNEL = new NotificationChannel(CHANNEL_ONE_ID,CHANNEL_ONE_NAME, NotificationManager.IMPORTANCE_HIGH);
         APP_CHANNEL.enableLights(true);
         APP_CHANNEL.setLightColor(Color.RED);
         APP_CHANNEL.setShowBadge(true);

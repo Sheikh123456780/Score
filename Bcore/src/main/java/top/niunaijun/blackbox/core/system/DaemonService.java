@@ -39,34 +39,39 @@ public class DaemonService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Intent innerIntent = new Intent(this, DaemonInnerService.class);
         startService(innerIntent);
-        if (BuildCompat.isOreo()) {
-            showNotification();
-        }
+        showNotification();
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "onDestroy");
     }
-
+    
     private void showNotification() {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".blackbox_core")
-                .setPriority(NotificationCompat.PRIORITY_MAX);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".vbox_core").setPriority(NotificationCompat.PRIORITY_MAX);
         startForeground(NOTIFY_ID, builder.build());
     }
+
+/*
+    private void showNotification() {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".blackbox_core").setPriority(NotificationCompat.PRIORITY_MAX);
+        if (BuildCompat.isVanillaIceCream()) {
+            startForeground(NOTIFY_ID, builder.build(), 1073741824);
+        } else {
+            startForeground(NOTIFY_ID, builder.build());
+        }
+    }
+*/
 
     public static class DaemonInnerService extends Service {
         @Override
         public void onCreate() {
-            Log.i(TAG, "DaemonInnerService -> onCreate");
             super.onCreate();
         }
 
         @Override
         public int onStartCommand(Intent intent, int flags, int startId) {
-            Log.i(TAG, "DaemonInnerService -> onStartCommand");
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             nm.cancel(NOTIFY_ID);
             stopSelf();
@@ -80,7 +85,6 @@ public class DaemonService extends Service {
 
         @Override
         public void onDestroy() {
-            Log.i(TAG, "DaemonInnerService -> onDestroy");
             super.onDestroy();
         }
     }

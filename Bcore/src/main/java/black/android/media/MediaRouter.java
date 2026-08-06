@@ -1,10 +1,12 @@
 package black.android.media;
 
+import android.content.Context;
 import android.os.IInterface;
 
 import top.niunaijun.blackreflection.annotation.BClassName;
 import top.niunaijun.blackreflection.annotation.BField;
 import top.niunaijun.blackreflection.annotation.BStaticField;
+import top.niunaijun.blackreflection.annotation.BStaticMethod;
 
 @BClassName("android.media.MediaRouter")
 public interface MediaRouter {
@@ -22,4 +24,8 @@ public interface MediaRouter {
         @BField
         IInterface mAudioService();
     }
+
+    // Add a method to get the MediaRouter instance dynamically for Android 10+
+    @BStaticMethod
+    Object getInstance(Context context);
 }

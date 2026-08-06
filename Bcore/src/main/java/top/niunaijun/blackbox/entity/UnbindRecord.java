@@ -4,13 +4,18 @@ import android.content.ComponentName;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+/**
+ * Created by Milk on 4/7/21.
+ * * ∧＿∧
+ * (`･ω･∥
+ * 丶　つ０
+ * しーＪ
+ * 此处无Bug
+ */
 public class UnbindRecord implements Parcelable {
     private int mBindCount;
     private int mStartId;
     private ComponentName mComponentName;
-    
-    // Android 16+ session - transient so not parcelled
-    private transient Object mSession;
 
     public int getStartId() {
         return mStartId;
@@ -36,12 +41,8 @@ public class UnbindRecord implements Parcelable {
         mComponentName = componentName;
     }
 
-    public Object getSession() {
-        return mSession;
-    }
-
-    public void setSession(Object session) {
-        this.mSession = session;
+    public static Creator<UnbindRecord> getCREATOR() {
+        return CREATOR;
     }
 
     public UnbindRecord() {

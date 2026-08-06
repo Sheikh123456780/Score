@@ -1,5 +1,6 @@
 package top.niunaijun.blackbox.core.system.pm;
 
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -10,6 +11,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
+import android.content.pm.PermissionInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
@@ -17,12 +19,14 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.RemoteException;
 import android.text.TextUtils;
-import java.util.HashMap;
+
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +46,7 @@ import top.niunaijun.blackbox.entity.pm.InstallResult;
 import top.niunaijun.blackbox.entity.pm.InstalledPackage;
 import top.niunaijun.blackbox.utils.AbiUtils;
 import top.niunaijun.blackbox.utils.FileUtils;
+import top.niunaijun.blackbox.utils.PermissionUtils;
 import top.niunaijun.blackbox.utils.Slog;
 import top.niunaijun.blackbox.utils.compat.PackageParserCompat;
 import top.niunaijun.blackbox.utils.compat.XposedParserCompat;
@@ -50,7 +55,7 @@ import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
 
 
 /**
- * Created by Milk on 4/1/21.
+ * Created by @RIYAZXERO on 4/1/21.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -60,14 +65,15 @@ import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
 public class BPackageManagerService extends IBPackageManagerService.Stub implements ISystemService {
     public static final String TAG = "BPackageManagerService";
     public static BPackageManagerService sService = new BPackageManagerService();
-    private final Settings mSettings = new Settings();
+    private final Settings mSettings = new Settings();      // 等同于 PackageCacheManager
     private final ComponentResolver mComponentResolver;
     private static final BUserManagerService sUserManager = BUserManagerService.get();
     private final List<PackageMonitor> mPackageMonitors = new ArrayList<>();
-    private final Map<String, ApplicationInfo> mFakeApps = new HashMap<>();
-
+    private final HashMap<String, BPackage.Permission> mPermissions = new HashMap<>();
 
     final Map<String, BPackageSettings> mPackages = mSettings.mPackages;
+    private final Map<String, String[]> mDangerousPermissions = new HashMap<>();
+
     final Object mInstallLock = new Object();
 
     public static BPackageManagerService get() {
@@ -99,9 +105,6 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
     @Override
     public ApplicationInfo getApplicationInfo(String packageName, int flags, int userId) {
         if (!sUserManager.exists(userId)) return null;
-        if (mFakeApps.containsKey(packageName)) {
-        return mFakeApps.get(packageName);
-    }
         if (Objects.equals(packageName, BlackBoxCore.getHostPkg())) {
             try {
                 return BlackBoxCore.getPackageManager().getApplicationInfo(packageName, flags);
@@ -298,7 +301,7 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
         }
         return null;
     }
-
+    
     @Override
     public ServiceInfo getServiceInfo(ComponentName component, int flags, int userId) {
         if (!sUserManager.exists(userId)) return null;
@@ -393,31 +396,21 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
         }
     }
 
-    private List<ApplicationInfo> getInstalledApplicationsListInternal(int flags, int userId,
-                                                                       int callingUid) {
+    private List<ApplicationInfo> getInstalledApplicationsListInternal(int flags, int userId,int callingUid) {
         if (!sUserManager.exists(userId)) return Collections.emptyList();
-
         // writer
         synchronized (mPackages) {
             ArrayList<ApplicationInfo> list;
             list = new ArrayList<>(mPackages.size());
             Collection<BPackageSettings> packageSettings = mPackages.values();
             for (BPackageSettings ps : packageSettings) {
-//                if (filterSharedLibPackageLPr(ps, Binder.getCallingUid(), userId, flags)) {
-//                    continue;
-//                }
-//                if (filterAppAccessLPr(ps, callingUid, userId)) {
-//                    continue;
-//                }
-//                if (GmsCore.isGoogleAppOrService(ps.pkg.packageName))
-//                    continue;
-                ApplicationInfo ai = PackageManagerCompat.generateApplicationInfo(ps.pkg, flags,
-                        ps.readUserState(userId), userId);
+                if (GmsCore.isGoogleAppOrService(ps.pkg.packageName))
+                    continue;
+                ApplicationInfo ai = PackageManagerCompat.generateApplicationInfo(ps.pkg, flags,ps.readUserState(userId), userId);
                 if (ai != null) {
                     list.add(ai);
                 }
             }
-            list.addAll(mFakeApps.values());
             return list;
         }
     }
@@ -611,6 +604,20 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
     public void stopPackage(String packageName, int userId) {
         BProcessManagerService.get().killPackageAsUser(packageName, userId);
     }
+    
+    @Override
+	public boolean isAppRunning(String packageName, int userId) {
+		ActivityManager activityManager = (ActivityManager) BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+		List<ActivityManager.RunningAppProcessInfo> processes = activityManager.getRunningAppProcesses();
+		if (processes == null) return false;
+
+		for (ActivityManager.RunningAppProcessInfo process : processes) {
+			if (Arrays.asList(process.pkgList).contains(packageName)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
     @Override
     public void deleteUser(int userId) throws RemoteException {
@@ -670,6 +677,38 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
         }
     }
 
+    public int checkUidPermission(String permission, int uid,String packageName) throws RemoteException {
+        PermissionInfo info = getPermissionInfo(permission, 0);
+        if (info != null) {
+            return 0;
+        }
+        return BlackBoxCore.getPackageManager().checkPermission(permission,packageName);
+    }
+
+    @Override
+    public int checkPermission(String permName, String pkgName, int userId) throws RemoteException {
+        if ("android.permission.INTERACT_ACROSS_USERS".equals(permName)
+                || "android.permission.INTERACT_ACROSS_USERS_FULL".equals(permName)) {
+            return PackageManager.PERMISSION_DENIED;
+        }
+        PermissionInfo permissionInfo = getPermissionInfo(permName, 0);
+        if (permissionInfo != null) {
+            return PackageManager.PERMISSION_GRANTED;
+        }
+        return BlackBoxCore.getPackageManager().checkPermission(permName,pkgName);
+    }
+
+    @Override
+    public PermissionInfo getPermissionInfo(String name, int flags) throws RemoteException {
+        synchronized (mPackages) {
+            BPackage.Permission p = mPermissions.get(name);
+            if (p != null) {
+                return new PermissionInfo(p.info);
+            }
+        }
+        return null;
+    }
+
     private InstallResult installPackageAsUserLocked(String file, InstallOption option, int userId) {
         long l = System.currentTimeMillis();
         InstallResult result = new InstallResult();
@@ -702,7 +741,7 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
             if (!support) {
                 String msg = packageArchiveInfo.applicationInfo.loadLabel(BlackBoxCore.getPackageManager()) + "[" + packageArchiveInfo.packageName + "]";
                 return result.installError(packageArchiveInfo.packageName,
-                        msg + "\n" + (BlackBoxCore.is64Bit() ? "The box does not support 32-bit Application" : "The box does not support 64-bit Application"));
+                        msg + (BlackBoxCore.is64Bit() ? " not support armeabi-v7a abi" : "not support arm64-v8a abi"));
             }
             PackageParser.Package aPackage = parserApk(apkFile.getAbsolutePath());
             if (aPackage == null) {
@@ -826,8 +865,18 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
             mComponentResolver.addAllComponents(value.pkg);
         }
     }
-    public void injectFakeApp(String packageName, ApplicationInfo info) {
-    mFakeApps.put(packageName, info);
-}
 
+    // 20240801 add request permission add start 0
+    public String[] getDangerousPermissions(String packageName) {
+        synchronized (mDangerousPermissions) {
+            return mDangerousPermissions.get(packageName);
+        }
+    }
+
+    public void analyzePackageLocked(BPackageSettings bPackageSettings) {
+        synchronized (mDangerousPermissions) {
+            mDangerousPermissions.put(bPackageSettings.pkg.packageName, PermissionUtils.findDangerousPermissions(bPackageSettings.pkg.requestedPermissions));
+        }
+    }
+    // 20240801 add request permission add end 0
 }

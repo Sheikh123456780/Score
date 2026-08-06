@@ -8,17 +8,16 @@ import java.lang.reflect.Method;
 import black.android.os.BRServiceManager;
 import black.android.os.mount.BRIMountServiceStub;
 import black.android.os.storage.BRIStorageManagerStub;
+
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
+import top.niunaijun.blackbox.utils.MethodParameterUtils;
 import top.niunaijun.blackbox.utils.Slog;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
-/**
- * Android 16 Compatible IStorageManagerProxy
- */
 public class IStorageManagerProxy extends BinderInvocationStub {
 
     public IStorageManagerProxy() {
@@ -46,53 +45,41 @@ public class IStorageManagerProxy extends BinderInvocationStub {
         return false;
     }
 
-    @ProxyMethod("fixupAppDir")
-    public static class FixupAppDir extends MethodHook {
-        @Override
-        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            Slog.e(TAG, "fixupAppDir");
-            if (args != null) {
-                for (Object o : args) {
-                    Slog.e(TAG, "args=" + o);
-                }
-            }
-            return method.invoke(who, args);
-        }
-    }
-
-    // 🔥 Fixed: Fallback to real system volume list on error or Android 16 verification failure
     @ProxyMethod("getVolumeList")
     public static class GetVolumeList extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             try {
-                StorageVolume[] volumeList = null;
-                if (args == null) {
-                    volumeList = BlackBoxCore.getBStorageManager().getVolumeList(BActivityThread.getBUid(), null, 0, BActivityThread.getUserId());
-                } else {
-                    int uid = (int) args[0];
-                    String packageName = (String) args[1];
-                    int flags = (int) args[2];
-                    volumeList = BlackBoxCore.getBStorageManager().getVolumeList(uid, packageName, flags, BActivityThread.getUserId());
+                // Android 12+ compatibility
+                int uid = BActivityThread.getBUid();
+                int userId = BActivityThread.getUserId();
+                String packageName = null;
+                int flags = 0;
+                if (args != null && args.length > 0) {
+                    if (args.length >= 3) {
+                        if (args[0] instanceof Integer) {
+                            uid = (Integer) args[0];
+                        }
+                        if (args[1] instanceof String) {
+                            packageName = (String) args[1];
+                        }
+                        flags = getFlags(args[2]);
+                    } else if (args.length == 1 && args[0] instanceof Integer) {
+                        uid = (Integer) args[0];
+                    }
                 }
 
-                if (volumeList != null && volumeList.length > 0) {
-                    return volumeList;
+                StorageVolume[] volumeList = BlackBoxCore.getBStorageManager().getVolumeList(uid, packageName, flags, userId);
+                if (volumeList == null || volumeList.length == 0) {
+                   // Slog.d("IStorageManagerProxy", "Volume list is null, calling original method");
+                    return method.invoke(who, args);
                 }
-            } catch (Throwable e) {
-    e.printStackTrace();
-}
-
-            // Real host system fallback for direct Android 16 resource verification
-            return method.invoke(who, args);
-        }
-    }
-
-   @ProxyMethod("getVolumes")
-    public static class GetVolumeVolumes extends MethodHook {
-        @Override
-        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return method.invoke(who, args);
+              //  Slog.d("IStorageManagerProxy", "Returning " + volumeList.length + " storage volumes");
+                return volumeList;
+            } catch (Throwable t) {
+                Slog.e("IStorageManagerProxy", "Error in getVolumeList hook: " + t.getMessage(), t);
+                return method.invoke(who, args);
+            }
         }
     }
 
@@ -100,14 +87,49 @@ public class IStorageManagerProxy extends BinderInvocationStub {
     public static class mkdirs extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            // Direct system execution for creating OBB/Data directories
+            try {
+           //     Slog.d("IStorageManagerProxy", "mkdirs hooked, returning 0");
+                return 0;
+            } catch (Throwable t) {
+                return method.invoke(who, args);
+            }
+        }
+    }
+
+    @ProxyMethod("getVolumePaths")
+    public static class GetVolumePaths extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             try {
                 return method.invoke(who, args);
             } catch (Throwable t) {
-    t.printStackTrace();
-    throw t;
-
+                return new String[0];
             }
+        }
+    }
+
+    private static int getFlags(Object arg) {
+        if (arg instanceof Integer) {
+            return (Integer) arg;
+        }
+        if (arg instanceof Long) {
+            return ((Long) arg).intValue();
+        }
+        if (arg instanceof String) {
+            try {
+                return Integer.parseInt((String) arg);
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    @Override
+    protected void onBindMethod() {
+        super.onBindMethod();
+        if (BuildCompat.isS()) {
+            addMethodHook(new GetVolumePaths());
         }
     }
 }

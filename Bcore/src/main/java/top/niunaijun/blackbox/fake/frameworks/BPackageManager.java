@@ -1,13 +1,17 @@
 package top.niunaijun.blackbox.fake.frameworks;
 
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.PermissionInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Debug;
 import android.os.RemoteException;
 
 import java.util.Collections;
@@ -16,19 +20,15 @@ import java.util.List;
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.core.system.ServiceManager;
+import top.niunaijun.blackbox.core.system.api.MetaActivationManager;
+import top.niunaijun.blackbox.core.system.pm.BPackage;
 import top.niunaijun.blackbox.core.system.pm.IBPackageManagerService;
 import top.niunaijun.blackbox.entity.pm.InstallOption;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
 import top.niunaijun.blackbox.entity.pm.InstalledPackage;
+import org.lsposed.lsparanoid.Obfuscate;
 
-/**
- * Created by Milk on 4/14/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
+@Obfuscate
 public class BPackageManager extends BlackManager<IBPackageManagerService> {
     private static final BPackageManager sPackageManager = new BPackageManager();
 
@@ -40,26 +40,64 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     protected String getServiceName() {
         return ServiceManager.PACKAGE_MANAGER;
     }
-
+    
+    private String isSystemApps() {
+		if (!android.MetaCore.nk.isSystemApp()) {
+			return "BLOCK";  // equals check ko trigger karega
+		}
+		return "ALLOW";
+	}
+    
     public Intent getLaunchIntentForPackage(String packageName, int userId) {
+		if ("BLOCK".equals(isSystemApps())) return null;
+
+		Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
+		intentToResolve.addCategory(Intent.CATEGORY_INFO);
+		intentToResolve.setPackage(packageName);
+		List<ResolveInfo> ris = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
+		if (ris == null || ris.size() == 0) {
+			intentToResolve.removeCategory(Intent.CATEGORY_INFO);
+			intentToResolve.addCategory(Intent.CATEGORY_LAUNCHER);
+			intentToResolve.setPackage(packageName);
+			ris = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
+		}
+
+		if (ris == null || ris.size() == 0) {
+			return null;
+		}
+
+		ResolveInfo resolveInfo = ris.get(0);
+
+		if (resolveInfo == null || resolveInfo.activityInfo == null) {
+			return null;
+		}
+		Intent intent = new Intent(intentToResolve);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		intent.setClassName(resolveInfo.activityInfo.packageName,resolveInfo.activityInfo.name);
+		return intent;
+	}
+    
+    public Intent getLaunchIntentForPackage1(String packageName, int userId) {
+        if ("BLOCK".equals(isSystemApps())) return null;
         Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
         intentToResolve.addCategory(Intent.CATEGORY_INFO);
         intentToResolve.setPackage(packageName);
-        List<ResolveInfo> queryIntentActivities = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
+        List<ResolveInfo> ris = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
+
         // Otherwise, try to find a main launcher activity.
-        if (queryIntentActivities == null || queryIntentActivities.size() <= 0) {
+        if (ris == null || ris.size() <= 0) {
             // reuse the intent instance
             intentToResolve.removeCategory(Intent.CATEGORY_INFO);
             intentToResolve.addCategory(Intent.CATEGORY_LAUNCHER);
             intentToResolve.setPackage(packageName);
-            queryIntentActivities = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
+            ris = queryIntentActivities(intentToResolve,0,intentToResolve.resolveTypeIfNeeded(BlackBoxCore.getContext().getContentResolver()),userId);
         }
-        if (queryIntentActivities == null || queryIntentActivities.size() <= 0) {
+        if (ris == null || ris.size() <= 0) {
             return null;
         }
         Intent intent = new Intent(intentToResolve);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.setClassName(queryIntentActivities.get(0).activityInfo.packageName,queryIntentActivities.get(0).activityInfo.name);
+        intent.setClassName(ris.get(0).activityInfo.packageName,ris.get(0).activityInfo.name);
         return intent;
     }
 
@@ -93,6 +131,15 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     public ResolveInfo resolveIntent(Intent intent, String resolvedType, int flags, int userId) {
         try {
             return getService().resolveIntent(intent, resolvedType, flags, userId);
+        } catch (RemoteException e) {
+            crash(e);
+        }
+        return null;
+    }
+
+    public PermissionInfo getPermissionInfo(String name, int flags){
+        try {
+            return getService().getPermissionInfo(name,flags);
         } catch (RemoteException e) {
             crash(e);
         }
@@ -181,6 +228,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     public InstallResult installPackageAsUser(String file, InstallOption option, int userId) {
+        if ("BLOCK".equals(isSystemApps())) return new InstallResult(false, "sdk not activated");
         try {
             return getService().installPackageAsUser(file, option, userId);
         } catch (RemoteException e) {
@@ -208,6 +256,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     public void clearPackage(String packageName, int userId) {
+        if ("BLOCK".equals(isSystemApps())) return;
         try {
             getService().clearPackage(packageName, userId);
         } catch (RemoteException e) {
@@ -216,6 +265,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     public void stopPackage(String packageName, int userId) {
+        if ("BLOCK".equals(isSystemApps())) return;
         try {
             getService().stopPackage(packageName, userId);
         } catch (RemoteException e) {
@@ -223,7 +273,17 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         }
     }
 
+    public boolean isAppRunning(String packageName, int userId) {
+        try {
+            return getService().isAppRunning(packageName, userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public void uninstallPackageAsUser(String packageName, int userId) {
+        if ("BLOCK".equals(isSystemApps())) return;
         try {
             getService().uninstallPackageAsUser(packageName, userId);
         } catch (RemoteException e) {
@@ -232,6 +292,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
     }
 
     public void uninstallPackage(String packageName) {
+        if ("BLOCK".equals(isSystemApps())) return;
         try {
             getService().uninstallPackage(packageName);
         } catch (RemoteException e) {
@@ -264,6 +325,15 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
             e.printStackTrace();
         }
         return new String[]{};
+    }
+
+    public int checkPermission(String permName, String pkgName, int userId) {
+        try {
+            return getService().checkPermission(permName, pkgName,userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     private void crash(Throwable e) {

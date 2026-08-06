@@ -12,10 +12,4 @@ public interface StorageVolume {
 
     @BField
     File mPath();
-
-    @BField
-File path();
-
-@BField
-File directory();
 }
