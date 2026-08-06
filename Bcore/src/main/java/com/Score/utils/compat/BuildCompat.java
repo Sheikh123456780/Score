@@ -16,45 +16,71 @@ public class BuildCompat {
     }
 
     // ============================================================
-    // ANDROID 14+ SUPPORT (UpsideDownCake API 34+)
+    // ANDROID 17+ (API 37+)
     // ============================================================
-    
     public static boolean isAndroid17() {
         return Build.VERSION.SDK_INT >= 37;
     }
     
+    // ============================================================
+    // ANDROID 16 (API 36+) - Baklava
+    // ============================================================
     public static boolean isAndroid16() {
         return Build.VERSION.SDK_INT >= 36;
     }
     
+    // ============================================================
+    // ANDROID 15 (API 35+) - Vanilla Ice Cream
+    // ============================================================
     public static boolean isAndroid15() {
         return Build.VERSION.SDK_INT >= 35 || (Build.VERSION.SDK_INT >= 34 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
     
-    public static boolean isAndroid14() {
+    // ============================================================
+    // ANDROID 14 (API 34+) - Upside Down Cake
+    // ============================================================
+    public static boolean isU() {
         return Build.VERSION.SDK_INT >= 34 || (Build.VERSION.SDK_INT >= 33 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
     
-    public static boolean isAndroid13() {
+    // ============================================================
+    // ANDROID 13 (API 33+) - Tiramisu
+    // ============================================================
+    public static boolean isT() {
         return Build.VERSION.SDK_INT >= 33 || (Build.VERSION.SDK_INT >= 32 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
-    
-    public static boolean isAndroid12() {
+
+    // ============================================================
+    // ANDROID 12 (API 31-32) - Snow Cone
+    // ============================================================
+    public static boolean isS() {
         return Build.VERSION.SDK_INT >= 31 || (Build.VERSION.SDK_INT >= 30 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    public static boolean isAndroid11() {
+    // ============================================================
+    // ANDROID 11 (API 30) - Red Velvet Cake
+    // ============================================================
+    public static boolean isR() {
         return Build.VERSION.SDK_INT >= 30 || (Build.VERSION.SDK_INT >= 29 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    public static boolean isAndroid10() {
+    // ============================================================
+    // ANDROID 10 (API 29) - Queen Cake
+    // ============================================================
+    public static boolean isQ() {
         return Build.VERSION.SDK_INT >= 29 || (Build.VERSION.SDK_INT >= 28 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
+    // ============================================================
+    // ANDROID 9 (API 28) - Pie
+    // ============================================================
     public static boolean isPie() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || (Build.VERSION.SDK_INT >= 27 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
+    // ============================================================
+    // ANDROID 8 (API 26-27) - Oreo
+    // ============================================================
     public static boolean isOreo() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O || (Build.VERSION.SDK_INT >= 25 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
@@ -64,23 +90,23 @@ public class BuildCompat {
     // ============================================================
     
     public static boolean isAndroid14OrAbove() {
-        return isAndroid14() || isAndroid15() || isAndroid16() || isAndroid17();
+        return isU() || isAndroid15() || isAndroid16() || isAndroid17();
     }
     
     public static boolean isAndroid13OrAbove() {
-        return isAndroid13() || isAndroid14OrAbove();
+        return isT() || isAndroid14OrAbove();
     }
     
     public static boolean isAndroid12OrAbove() {
-        return isAndroid12() || isAndroid13OrAbove();
+        return isS() || isAndroid13OrAbove();
     }
     
     public static boolean isAndroid11OrAbove() {
-        return isAndroid11() || isAndroid12OrAbove();
+        return isR() || isAndroid12OrAbove();
     }
     
     public static boolean isAndroid10OrAbove() {
-        return isAndroid10() || isAndroid11OrAbove();
+        return isQ() || isAndroid11OrAbove();
     }
 
     public static boolean isN_MR1() {
