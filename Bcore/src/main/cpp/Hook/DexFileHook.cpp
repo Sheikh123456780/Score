@@ -8,7 +8,11 @@
 HOOK_JNI(jobject, openDexFileNative, JNIEnv *env, jobject obj,jstring sourceName, jstring outputName, jint flags,jobject loader, jobject elements) {
     const char *sourceNameC = env->GetStringUTFChars(sourceName, JNI_FALSE);
     ALOGD("openDexFileNative: %s", sourceNameC);
-    if(strstr(sourceNameC,"/RIYAZPAPA/") != nullptr){
+    if(strstr(sourceNameC,"/blackbox/") != nullptr){
+//        const char *file_ext = strrchr(sourceNameC,'.');
+//        if(strcmp(file_ext,".dex") == 0 || strcmp(file_ext,".apk") == 0 || strcmp(file_ext,".jar") == 0){
+//
+//        }
         DexFileHook::setFileReadonly(sourceNameC);
     }
     jobject orig = orig_openDexFileNative(env, obj,sourceName,outputName,flags,loader,elements);
@@ -20,7 +24,8 @@ HOOK_JNI(jobject, openDexFileNative, JNIEnv *env, jobject obj,jstring sourceName
 void DexFileHook::init(JNIEnv *env) {
     if (BoxCore::getApiLevel() >= __ANDROID_API_U__) {
         const char *clazz = "dalvik/system/DexFile";
-        JniHook::HookJniFun(env, clazz, "openDexFileNative", "(Ljava/lang/String;Ljava/lang/String;ILjava/lang/ClassLoader;[Ldalvik/system/DexPathList$Element;)Ljava/lang/Object;", (void *) new_openDexFileNative,(void **) (&orig_openDexFileNative), true);
+        JniHook::HookJniFun(env, clazz, "openDexFileNative", "(Ljava/lang/String;Ljava/lang/String;ILjava/lang/ClassLoader;[Ldalvik/system/DexPathList$Element;)Ljava/lang/Object;", (void *) new_openDexFileNative,
+                            (void **) (&orig_openDexFileNative), true);
     }
 }
 

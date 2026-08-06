@@ -1,7 +1,12 @@
+//
+// Created by Milk on 4/10/21.
+//
+
 #include "IO.h"
 #include "Log.h"
 
 jmethodID getAbsolutePathMethodId;
+
 list<IO::RelocateInfo> relocate_rule;
 
 char *replace(const char *str, const char *src, const char *dst) {
@@ -33,9 +38,9 @@ const char *IO::redirectPath(const char *__path) {
     list<IO::RelocateInfo>::iterator iterator;
     for (iterator = relocate_rule.begin(); iterator != relocate_rule.end(); ++iterator) {
         IO::RelocateInfo info = *iterator;
-        if (strstr(__path, info.targetPath) && !strstr(__path, "/SdCard/")) {
+        if (strstr(__path, info.targetPath) && !strstr(__path, "/blackbox/")) {
             char *ret = replace(__path, info.targetPath, info.relocatePath);
-             ALOGD("redirectPath %s  => %s", __path, ret);
+            // ALOGD("redirectPath %s  => %s", __path, ret);
             return ret;
         }
     }
@@ -43,10 +48,20 @@ const char *IO::redirectPath(const char *__path) {
 }
 
 jstring IO::redirectPath(JNIEnv *env, jstring path) {
+//    const char * pathC = env->GetStringUTFChars(path, JNI_FALSE);
+//    const char *redirect = redirectPath(pathC);
+//    env->ReleaseStringUTFChars(path, pathC);
+//    return env->NewStringUTF(redirect);
     return BoxCore::redirectPathString(env, path);
 }
 
 jobject IO::redirectPath(JNIEnv *env, jobject path) {
+//    auto pathStr =
+//            reinterpret_cast<jstring>(env->CallObjectMethod(path, getAbsolutePathMethodId));
+//    jstring redirect = redirectPath(env, pathStr);
+//    jobject file = env->NewObject(fileClazz, fileNew, redirect);
+//    env->DeleteLocalRef(pathStr);
+//    env->DeleteLocalRef(redirect);
     return BoxCore::redirectPathFile(env, path);
 }
 

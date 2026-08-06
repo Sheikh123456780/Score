@@ -1,5 +1,6 @@
-#ifndef VBOX_DEXFILEHOOK_H
-#define VBOX_DEXFILEHOOK_H
+
+#ifndef BLACKBOX2_DEXFILEHOOK_H
+#define BLACKBOX2_DEXFILEHOOK_H
 
 #include "BaseHook.h"
 
@@ -10,4 +11,4 @@ public:
 };
 
 
-#endif //VBOX_DEXFILEHOOK_H
+#endif //BLACKBOX2_DEXFILEHOOK_H

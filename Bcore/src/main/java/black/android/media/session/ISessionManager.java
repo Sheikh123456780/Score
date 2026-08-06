@@ -1,6 +1,5 @@
 package black.android.media.session;
 
-import android.content.Context;
 import android.os.IBinder;
 import android.os.IInterface;
 
@@ -14,8 +13,4 @@ public interface ISessionManager {
         @BStaticMethod
         IInterface asInterface(IBinder IBinder0);
     }
-
-    // Add a method to get the ISessionManager instance dynamically for Android 10+
-    @BStaticMethod
-    IInterface getService(Context context);
 }

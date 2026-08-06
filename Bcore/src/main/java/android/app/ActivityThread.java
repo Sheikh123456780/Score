@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Created by @RIYAZXERO on 3/7/21.
+ * Created by Milk on 2021/5/7.
  * * ∧＿∧
  * (`･ω･∥
  * 丶　つ０
@@ -44,7 +44,8 @@ public class ActivityThread {
         throw new RuntimeException();
     }
 
-    public ContentProviderHolder installProvider(Context context,ContentProviderHolder holder, ProviderInfo info,boolean noisy, boolean noReleaseNeeded, boolean stable) {
+    public ContentProviderHolder installProvider(Context context, ContentProviderHolder holder, ProviderInfo info, boolean noisy,
+                                                 boolean noReleaseNeeded, boolean stable) {
         throw new RuntimeException();
     }
 

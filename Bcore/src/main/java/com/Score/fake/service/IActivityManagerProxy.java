@@ -1,0 +1,731 @@
+package com.Score.fake.service;
+
+import android.Manifest;
+import android.app.ActivityManager;
+import android.app.IServiceConnection;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.IIntentReceiver;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ProviderInfo;
+import android.content.pm.ResolveInfo;
+import android.os.IBinder;
+import android.os.IInterface;
+import android.util.Log;
+
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Objects;
+
+import black.android.app.BRActivityManagerNative;
+import black.android.app.BRActivityManagerOreo;
+import black.android.app.BRLoadedApkReceiverDispatcher;
+import black.android.app.BRLoadedApkReceiverDispatcherInnerReceiver;
+import black.android.app.BRLoadedApkServiceDispatcher;
+import black.android.app.BRLoadedApkServiceDispatcherInnerConnection;
+import black.android.content.BRContentProviderNative;
+import black.android.content.pm.BRUserInfo;
+import black.android.util.BRSingleton;
+import com.Score.ScoreCore;
+import com.Score.app.BActivityThread;
+import com.Score.core.env.AppSystemEnv;
+import com.Score.entity.AppConfig;
+import com.Score.entity.am.RunningAppProcessInfo;
+import com.Score.entity.am.RunningServiceInfo;
+import com.Score.fake.delegate.ContentProviderDelegate;
+import com.Score.fake.delegate.InnerReceiverDelegate;
+import com.Score.fake.delegate.ServiceConnectionDelegate;
+import com.Score.fake.frameworks.BActivityManager;
+import com.Score.fake.frameworks.BPackageManager;
+import com.Score.fake.hook.ClassInvocationStub;
+import com.Score.fake.hook.MethodHook;
+import com.Score.fake.hook.ProxyMethod;
+import com.Score.fake.hook.ScanClass;
+import com.Score.fake.service.base.PkgMethodProxy;
+import com.Score.fake.service.context.providers.ContentProviderStub;
+import com.Score.proxy.ProxyManifest;
+import com.Score.proxy.record.ProxyBroadcastRecord;
+import com.Score.proxy.record.ProxyPendingRecord;
+import com.Score.utils.MethodParameterUtils;
+import com.Score.utils.Reflector;
+import com.Score.utils.compat.ActivityManagerCompat;
+import com.Score.utils.compat.BuildCompat;
+import com.Score.utils.compat.ParceledListSliceCompat;
+import com.Score.utils.compat.TaskDescriptionCompat;
+
+import static android.content.Context.RECEIVER_EXPORTED;
+import static android.content.Context.RECEIVER_NOT_EXPORTED;
+import static android.content.pm.PackageManager.GET_META_DATA;
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+/**
+ * Created by Milk on 3/30/21.
+ * * ∧＿∧
+ * (`･ω･∥
+ * 丶　つ０
+ * しーＪ
+ * 此处无Bug
+ */
+@ScanClass(ActivityManagerCommonProxy.class)
+public class IActivityManagerProxy extends ClassInvocationStub {
+    public static final String TAG = "ActivityManagerStub";
+
+    @Override
+    protected Object getWho() {
+        Object iActivityManager = null;
+        if (BuildCompat.isOreo()) {
+            iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
+        } else if (BuildCompat.isL()) {
+            iActivityManager = BRActivityManagerNative.get().gDefault();
+        }
+        return BRSingleton.get(iActivityManager).get();
+    }
+
+    @Override
+    protected void inject(Object base, Object proxy) {
+        Object iActivityManager = null;
+        if (BuildCompat.isOreo()) {
+            iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
+        } else if (BuildCompat.isL()) {
+            iActivityManager = BRActivityManagerNative.get().gDefault();
+        }
+        BRSingleton.get(iActivityManager)._set_mInstance(proxy);
+    }
+
+    @Override
+    public boolean isBadEnv() {
+        return getProxyInvocation() != getWho();
+    }
+
+    @Override
+    protected void onBindMethod() {
+        super.onBindMethod();
+        addMethodHook(new PkgMethodProxy("getAppStartMode"));
+        addMethodHook(new PkgMethodProxy("setAppLockedVerifying"));
+        addMethodHook(new PkgMethodProxy("reportJunkFromApp"));
+    }
+
+    @ProxyMethod("getContentProvider")
+    public static class GetContentProvider extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Exception {
+            int authIndex = getAuthIndex();
+            Object auth = args[authIndex];
+            Object content = null;
+
+            if (auth instanceof String) {
+                if (ProxyManifest.isProxy((String) auth)) {
+                    return method.invoke(who, args);
+                }
+
+                if (BuildCompat.isQ()) {
+                    args[1] = ScoreCore.getHostPkg();
+                }
+
+                if (auth.equals("settings") || auth.equals("media") || auth.equals("telephony")) {
+                    content = method.invoke(who, args);
+                    ContentProviderDelegate.update(content, (String) auth);
+                    return content;
+                } else {
+                    Log.d(TAG, "hook getContentProvider: " + auth);
+
+                    ProviderInfo providerInfo = ScoreCore.getBPackageManager().resolveContentProvider((String) auth, GET_META_DATA, BActivityThread.getUserId());
+
+                    Log.d(TAG, "hook app: " + auth);
+                    IBinder providerBinder = null;
+                    if (BActivityThread.getAppPid() != -1) {
+                        AppConfig appConfig = ScoreCore.getBActivityManager().initProcess(providerInfo.packageName, providerInfo.processName, BActivityThread.getUserId());
+                        if (appConfig.bpid != BActivityThread.getAppPid()) {
+                            providerBinder = ScoreCore.getBActivityManager().acquireContentProviderClient(providerInfo);
+                        }
+                        args[authIndex] = ProxyManifest.getProxyAuthorities(appConfig.bpid);
+                        args[getUserIndex()] = ScoreCore.getHostUserId();
+                    }
+                    if (providerBinder == null)
+                        return null;
+
+                    content = method.invoke(who, args);
+                    Reflector.with(content)
+                            .field("info")
+                            .set(providerInfo);
+                    Reflector.with(content)
+                            .field("provider")
+                            .set(new ContentProviderStub().wrapper(BRContentProviderNative.get().asInterface(providerBinder), BActivityThread.getAppPackageName()));
+                }
+
+                return content;
+            }
+            return method.invoke(who, args);
+        }
+
+        private int getAuthIndex() {
+            // 10.0
+            if (BuildCompat.isQ()) {
+                return 2;
+            } else {
+                return 1;
+            }
+        }
+
+        private int getUserIndex() {
+            return getAuthIndex() + 1;
+        }
+    }
+
+    @ProxyMethod("startService")
+    public static class StartService extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            Intent intent = (Intent) args[1];
+            String resolvedType = (String) args[2];
+            ResolveInfo resolveInfo = ScoreCore.getBPackageManager().resolveService(intent, 0, resolvedType, BActivityThread.getUserId());
+            if (resolveInfo == null) {
+                return method.invoke(who, args);
+            }
+
+            int requireForegroundIndex = getRequireForeground();
+            boolean requireForeground = false;
+            if (requireForegroundIndex != -1) {
+                requireForeground = (boolean) args[requireForegroundIndex];
+            }
+            return ScoreCore.getBActivityManager().startService(intent, resolvedType, requireForeground, BActivityThread.getUserId());
+        }
+
+        public int getRequireForeground() {
+            if (BuildCompat.isOreo()) {
+                return 3;
+            }
+            return -1;
+        }
+    }
+
+    @ProxyMethod("stopService")
+    public static class StopService extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            Intent intent = (Intent) args[1];
+            String resolvedType = (String) args[2];
+            return ScoreCore.getBActivityManager().stopService(intent, resolvedType, BActivityThread.getUserId());
+        }
+    }
+
+    @ProxyMethod("stopServiceToken")
+    public static class StopServiceToken extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            ComponentName componentName = (ComponentName) args[0];
+            IBinder token = (IBinder) args[1];
+            ScoreCore.getBActivityManager().stopServiceToken(componentName, token, BActivityThread.getUserId());
+            return true;
+        }
+    }
+    
+    static IServiceConnection  StartService;
+    
+    
+    public static Object BindServiceCommon(Object who, Method method, Object[] args, int callingPackageIndex) throws Throwable {
+        IInterface iInterface = (IInterface) args[0];
+        IBinder iBinder = (IBinder) args[1];
+        Intent intent = (Intent) args[2];
+        String resolvedType = (String) args[3];
+        IServiceConnection connection = (IServiceConnection) args[4];
+
+        ComponentName component = intent.getComponent();
+        long flags = getIntOrLongValue(args[5]);
+
+        int userId = intent.getIntExtra("_B_|_UserId", -1);
+        userId = userId == -1 ? BActivityThread.getUserId() : userId;
+
+        ResolveInfo resolveInfo = ScoreCore.getBPackageManager().resolveService(intent, 0, resolvedType, userId);
+
+        if (component != null && component.getPackageName().equals(ScoreCore.getHostPkg())) {
+            return method.invoke(who, args);
+        }
+
+        int callingPkgIdx = isIsolated() ? 7 : 6;
+        if (args.length > callingPkgIdx && (args[callingPkgIdx] instanceof String)) {
+            args[callingPkgIdx] = ScoreCore.getHostPkg();
+        }
+
+        if (resolveInfo == null) {
+            if (component == null || !AppSystemEnv.isOpenPackage(component.getPackageName())) {
+                Log.e("ActivityManager", "Block bindService: " + intent);
+                return 0;
+            }
+            MethodParameterUtils.replaceLastUserId(args);
+            return method.invoke(who, args);
+        }
+
+        if ((flags & (-2147483648L)) != 0) {
+            args[5] = (flags & 2147483647L);
+        }
+
+        AppConfig appConfig = BActivityManager.get().initProcess(
+            resolveInfo.serviceInfo.packageName,
+            resolveInfo.serviceInfo.name,
+            userId);
+
+        if (appConfig == null) {
+            Log.e("ActivityManager", "failed to initProcess for bindService: " + component);
+            return 0;
+        }
+
+        Intent proxyIntent = ScoreCore.getBActivityManager().bindService(
+            intent,
+            connection == null ? null : connection.asBinder(),
+            resolvedType,
+            userId);
+
+        args[2] = proxyIntent;
+        args[4] = ServiceConnectionDelegate.createProxy(connection, intent);
+
+        WeakReference<?> weakReference = BRLoadedApkServiceDispatcherInnerConnection.get(connection).mDispatcher();
+        if (weakReference != null && weakReference.get() != null) {
+            BRLoadedApkServiceDispatcher.get(weakReference.get())
+                ._set_mConnection(ServiceConnectionDelegate.createProxy(connection, intent));
+        }
+
+        return method.invoke(who, args);
+    }
+
+    private static boolean isIsolated() {
+        return false;
+    }
+
+    private static long getIntOrLongValue(Object obj) {
+        if (obj instanceof Number) {
+            return ((Number) obj).longValue();
+        }
+        return 0L;
+    }
+
+    @ProxyMethod("bindService")
+    public static class BindService extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return BindServiceCommon(who, method, args, 6);
+        }
+
+        @Override
+        protected boolean isEnable() {
+            return ScoreCore.get().isBlackProcess() || ScoreCore.get().isServerProcess();
+        }
+    }
+    
+    // android 14 add
+    @ProxyMethod("bindServiceInstance")
+    public static class bindServiceInstance extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return BindServiceCommon(who,method,args,7);
+        }
+
+        @Override
+        protected boolean isEnable() {
+            return ScoreCore.get().isBlackProcess() || ScoreCore.get().isServerProcess();
+        }
+    }
+
+    // 10.0
+    @ProxyMethod("bindIsolatedService")
+    public static class BindIsolatedService extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            // instanceName
+            args[6] = null;
+            return BindServiceCommon(who,method,args,7);
+        }
+
+        @Override
+        protected boolean isEnable() {
+            return ScoreCore.get().isBlackProcess() || ScoreCore.get().isServerProcess();
+        }
+    }
+
+    @ProxyMethod("unbindService")
+    public static class UnbindService extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            IServiceConnection iServiceConnection = (IServiceConnection) args[0];
+            if (iServiceConnection == null) {
+                return method.invoke(who, args);
+            }
+            ScoreCore.getBActivityManager().unbindService(iServiceConnection.asBinder(), BActivityThread.getUserId());
+            ServiceConnectionDelegate delegate = ServiceConnectionDelegate.getDelegate(iServiceConnection.asBinder());
+            if (delegate != null) {
+                args[0] = delegate;
+            }
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("getRunningAppProcesses")
+    public static class GetRunningAppProcesses extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            RunningAppProcessInfo runningAppProcesses = BActivityManager.get().getRunningAppProcesses(BActivityThread.getAppPackageName(), BActivityThread.getUserId());
+            if (runningAppProcesses == null) {
+                return new ArrayList<>();
+            }
+            return runningAppProcesses.mAppProcessInfoList;
+        }
+    }
+
+    @ProxyMethod("getServices")
+    public static class GetServices extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            RunningServiceInfo runningServices = BActivityManager.get().getRunningServices(BActivityThread.getAppPackageName(), BActivityThread.getUserId());
+            if (runningServices == null) {
+                return new ArrayList<>();
+            }
+            return runningServices.mRunningServiceInfoList;
+        }
+    }
+
+    @ProxyMethod("getIntentSender")
+    public static class GetIntentSender extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            int type = (int) args[0];
+            Intent[] intents = (Intent[]) args[getIntentsIndex(args)];
+            MethodParameterUtils.replaceFirstAppPkg(args);
+
+            for (int i = 0; i < intents.length; i++) {
+                Intent intent = intents[i];
+                switch (type) {
+                    case ActivityManagerCompat.INTENT_SENDER_ACTIVITY:
+                        Intent shadow = new Intent();
+                        shadow.setComponent(new ComponentName(ScoreCore.getHostPkg(), ProxyManifest.getProxyPendingActivity(BActivityThread.getAppPid())));
+                        ProxyPendingRecord.saveStub(shadow, intent, BActivityThread.getUserId());
+                        intents[i] = shadow;
+                        break;
+                }
+            }
+            IInterface invoke = (IInterface) method.invoke(who, args);
+            if (invoke != null) {
+                String[] packagesForUid = BPackageManager.get().getPackagesForUid(BActivityThread.getCallingBUid());
+                if (packagesForUid.length < 1) {
+                    packagesForUid = new String[]{ScoreCore.getHostPkg()};
+                }
+                ScoreCore.getBActivityManager().getIntentSender(invoke.asBinder(), packagesForUid[0], BActivityThread.getCallingBUid());
+            }
+            return invoke;
+        }
+
+        private int getIntentsIndex(Object[] args) {
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof Intent[]) {
+                    return i;
+                }
+            }
+            if (BuildCompat.isR()) {
+                return 6;
+            } else {
+                return 5;
+            }
+        }
+    }
+
+    @ProxyMethod("getPackageForIntentSender")
+    public static class getPackageForIntentSender extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            IInterface invoke = (IInterface) args[0];
+            return ScoreCore.getBActivityManager().getPackageForIntentSender(invoke.asBinder());
+        }
+    }
+
+    @ProxyMethod("getUidForIntentSender")
+    public static class getUidForIntentSender extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            IInterface invoke = (IInterface) args[0];
+            return ScoreCore.getBActivityManager().getUidForIntentSender(invoke.asBinder());
+        }
+    }
+
+    @ProxyMethod("getIntentSenderWithSourceToken")
+    public static class GetIntentSenderWithSourceToken extends GetIntentSender {
+    }
+
+    @ProxyMethod("getIntentSenderWithFeature")
+    public static class GetIntentSenderWithFeature extends GetIntentSender {
+    }
+
+    // ========== OOIA! FIXED - SKIP PROCESSING TO PREVENT CRASH ==========
+    @ProxyMethod("broadcastIntentWithFeature")
+    public static class BroadcastIntentWithFeature extends BroadcastIntent {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            // OOIA! Skip all processing to prevent SecurityException crash
+            return method.invoke(who, args);
+        }
+    }
+
+    // ========== OOIA! FIXED - SKIP PROCESSING TO PREVENT CRASH ==========
+    @ProxyMethod("broadcastIntent")
+    public static class BroadcastIntent extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            // OOIA! Skip all processing to prevent SecurityException crash
+            return method.invoke(who, args);
+        }
+
+        int getIntentIndex(Object[] args) {
+            for (int i = 0; i < args.length; i++) {
+                Object arg = args[i];
+                if (arg instanceof Intent) {
+                    return i;
+                }
+            }
+            return 1;
+        }
+    }
+
+    @ProxyMethod("unregisterReceiver")
+    public static class unregisterReceiver extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("finishReceiver")
+    public static class finishReceiver extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("publishService")
+    public static class PublishService extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("peekService")
+    public static class PeekService extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceLastAppPkg(args);
+            Intent intent = (Intent) args[0];
+            String resolvedType = (String) args[1];
+            IBinder peek = ScoreCore.getBActivityManager().peekService(intent, resolvedType, BActivityThread.getUserId());
+            return peek;
+        }
+    }
+
+    // todo
+    @ProxyMethod("sendIntentSender")
+    public static class SendIntentSender extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return 0;
+        }
+    }
+
+    // android 11 add
+    @ProxyMethod("registerReceiverWithFeature")
+    public static class RegisterReceiverWithFeature extends MethodHook{
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            int receiverIndex = getReceiverIndex();
+            if (args[receiverIndex] != null) {
+                IIntentReceiver intentReceiver = (IIntentReceiver) args[receiverIndex];
+                IIntentReceiver proxy = InnerReceiverDelegate.createProxy(intentReceiver);
+
+                WeakReference<?> weakReference = BRLoadedApkReceiverDispatcherInnerReceiver.get(intentReceiver).mDispatcher();
+                if (weakReference != null) {
+                    BRLoadedApkReceiverDispatcher.get(weakReference.get())._set_mIIntentReceiver(proxy);
+                }
+
+                args[receiverIndex] = proxy;
+            }
+            // ignore permission
+            if (args[getPermissionIndex()] != null) {
+                args[getPermissionIndex()] = null;
+            }
+
+            if (BuildCompat.isU()) {
+                int flagsIndex = args.length - 1;
+                int flags = (int)args[flagsIndex];
+                if((flags & RECEIVER_NOT_EXPORTED) == 0 && (flags & RECEIVER_EXPORTED) == 0){
+                    flags |= RECEIVER_NOT_EXPORTED;
+                }
+                args[flagsIndex] = flags;
+            }
+
+            return method.invoke(who, args);
+        }
+
+        public int getReceiverIndex() {
+            if (BuildCompat.isS()) {
+                return 4;
+            }
+            return 3;
+        }
+
+        public int getPermissionIndex() {
+            if (BuildCompat.isS()) {
+                return 6;
+            }
+            return 5;
+        }
+    }
+
+    //maxTargetSdk=29
+    @ProxyMethod("registerReceiver")
+    public static class RegisterReceiver extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceFirstAppPkg(args);
+            int receiverIndex = 2;
+            if (args[receiverIndex] != null) {
+                IIntentReceiver intentReceiver = (IIntentReceiver) args[receiverIndex];
+                IIntentReceiver proxy = InnerReceiverDelegate.createProxy(intentReceiver);
+
+                WeakReference<?> weakReference = BRLoadedApkReceiverDispatcherInnerReceiver.get(intentReceiver).mDispatcher();
+                if (weakReference != null) {
+                    BRLoadedApkReceiverDispatcher.get(weakReference.get())._set_mIIntentReceiver(proxy);
+                }
+
+                args[receiverIndex] = proxy;
+            }
+            int permissionIndex = 4;
+            // ignore permission
+            if (args[permissionIndex] != null) {
+                args[permissionIndex] = null;
+            }
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("grantUriPermission")
+    public static class GrantUriPermission extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceLastUid(args);
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("setServiceForeground")
+    public static class setServiceForeground extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+//            if (args[0] instanceof ComponentName) {
+//                args[0] = new ComponentName(ScoreCore.getHostPkg(), ProxyManifest.getProxyService(BActivityThread.getAppPid()));
+//            }
+//            return method.invoke(who, args);
+            return 0;
+        }
+    }
+
+    @ProxyMethod("getHistoricalProcessExitReasons")
+    public static class getHistoricalProcessExitReasons extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return ParceledListSliceCompat.create(new ArrayList<>());
+        }
+    }
+
+    @ProxyMethod("getCurrentUser")
+    public static class getCurrentUser extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            Object blackBox = BRUserInfo.get()._new(BActivityThread.getUserId(), "BlackBox", BRUserInfo.get().FLAG_PRIMARY());
+            return blackBox;
+        }
+    }
+
+    @ProxyMethod("checkPermission")
+    public static class checkPermission extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            MethodParameterUtils.replaceLastUid(args);
+            String permission = (String) args[0];
+            if (permission.equals(Manifest.permission.ACCOUNT_MANAGER)
+                    || permission.equals(Manifest.permission.SEND_SMS)) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("checkUriPermission")
+    public static class checkUriPermission extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return PERMISSION_GRANTED;
+        }
+    }
+
+    // for < Android 10
+    @ProxyMethod("setTaskDescription")
+    public static class SetTaskDescription extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            ActivityManager.TaskDescription td = (ActivityManager.TaskDescription) args[1];
+            args[1] = TaskDescriptionCompat.fix(td);
+            return method.invoke(who, args);
+        }
+    }
+
+    @ProxyMethod("setRequestedOrientation")
+    public static class setRequestedOrientation extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            try {
+                return method.invoke(who, args);
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
+            return 0;
+        }
+    }
+
+    @ProxyMethod("registerUidObserver")
+    public static class registerUidObserver extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return 0;
+        }
+    }
+
+    @ProxyMethod("unregisterUidObserver")
+    public static class unregisterUidObserver extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return 0;
+        }
+    }
+
+    @ProxyMethod("updateConfiguration")
+    public static class updateConfiguration extends MethodHook {
+
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return 0;
+        }
+    }
+}

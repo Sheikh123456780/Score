@@ -62,9 +62,6 @@ public interface LoadedApk {
     @BMethod
     Application makeApplication(boolean boolean0, Instrumentation Instrumentation1);
 
-    @BField
-    Object mAppComponentFactory();
-
     @BClassName("android.app.LoadedApk$ServiceDispatcher")
     interface ServiceDispatcher {
         @BField

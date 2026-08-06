@@ -11,6 +11,6 @@ public interface IConnectivityManager {
     @BClassName("android.net.IConnectivityManager$Stub")
     interface Stub {
         @BStaticMethod
-        IInterface asInterface(IBinder binder);
+        IInterface asInterface(IBinder IBinder0);
     }
 }

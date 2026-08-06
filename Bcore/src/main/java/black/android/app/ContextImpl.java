@@ -34,7 +34,4 @@ public interface ContextImpl {
 
     @BMethod
     Object getAttributionSource();
-
-    @BMethod
-    PackageManager getPackageManager();
 }

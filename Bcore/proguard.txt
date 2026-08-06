@@ -1,5 +1,0 @@
--keep class top.niunaijun.blackbox.** {*; }
--keep class top.niunaijun.blackbox.jnihook.** {*; }
--keep class black.** {*; }
--keep class android.** {*; }
--keep class com.android.** {*; }

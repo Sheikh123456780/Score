@@ -2,8 +2,8 @@
 // Created by Milk on 4/9/21.
 //
 
-#ifndef VBOX_BASEHOOK_H
-#define VBOX_BASEHOOK_H
+#ifndef VIRTUALM_BASEHOOK_H
+#define VIRTUALM_BASEHOOK_H
 
 #include <jni.h>
 #include <Log.h>
@@ -14,4 +14,4 @@ public:
 };
 
 
-#endif //VBOX_BASEHOOK_H
+#endif //VIRTUALM_BASEHOOK_H

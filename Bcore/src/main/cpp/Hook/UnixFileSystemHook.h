@@ -2,8 +2,8 @@
 // Created by Milk on 4/9/21.
 //
 
-#ifndef VBOX_UNIXFILESYSTEMHOOK_H
-#define VBOX_UNIXFILESYSTEMHOOK_H
+#ifndef VIRTUALM_UNIXFILESYSTEMHOOK_H
+#define VIRTUALM_UNIXFILESYSTEMHOOK_H
 
 
 #include "BaseHook.h"
@@ -14,4 +14,4 @@ public:
 };
 
 
-#endif //VBOX_UNIXFILESYSTEMHOOK_H
+#endif //VIRTUALM_UNIXFILESYSTEMHOOK_H

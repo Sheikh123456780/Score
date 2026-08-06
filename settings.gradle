@@ -1,3 +1,4 @@
 include ':Bcore'
 
-rootProject.name = "Bcore-FIXED"
+
+rootProject.name = "shayk"

@@ -10,23 +10,23 @@ import top.niunaijun.blackreflection.annotation.BField;
 @BClassName("android.net.NetworkInfo")
 public interface NetworkInfo {
     @BConstructor
-    NetworkInfo _new(int type);
+    NetworkInfo _new(int int0, int int1, String String2, String String3);
 
     @BConstructor
-    NetworkInfo _new(int type, int subType, String typeName, String subTypeName);
+    NetworkInfo _new(int int0);
 
     @BField
     DetailedState mDetailedState();
 
     @BField
-    State mState();
-
-    @BField
     boolean mIsAvailable();
 
     @BField
-    String mTypeName();
+    int mNetworkType();
 
     @BField
-    int mNetworkType();
+    State mState();
+
+    @BField
+    String mTypeName();
 }

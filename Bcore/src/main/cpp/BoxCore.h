@@ -2,14 +2,19 @@
 // Created by Milk on 4/9/21.
 //
 
-#ifndef VIRTUAL_APP_BOXCORE
-#define VIRTUAL_APP_BOXCORE
+#ifndef VIRTUALM_VMCORE_H
+#define VIRTUALM_VMCORE_H
 
 #include <jni.h>
-#include <unistd.h>
-//#include <fb/include/fb/ALog.h>
-//#include <fb/include/fb/fbjni.h>
-#define VMCORE_CLASS "top/niunaijun/blackbox/core/RNative"
+#include <sys/syscall.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
+#include <sys/signal.h>
+#include <sys/unistd.h>
+#include <linux/prctl.h>
+#include <sys/prctl.h>
+
+#define VMCORE_CLASS "com.Score/core/NativeCore"
 
 class BoxCore {
 public:
@@ -21,4 +26,5 @@ public:
     static jlongArray loadEmptyDex(JNIEnv *env);
 };
 
-#endif //VIRTUAL_APP_BOXCORE
+
+#endif //VIRTUALM_VMCORE_H

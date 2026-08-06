@@ -2,8 +2,8 @@
 // Created by Milk on 2021/5/5.
 //
 
-#ifndef VBOX_VMCLASSLOADERHOOK_H
-#define VBOX_VMCLASSLOADERHOOK_H
+#ifndef BLACKBOX_VMCLASSLOADERHOOK_H
+#define BLACKBOX_VMCLASSLOADERHOOK_H
 
 
 #include "BaseHook.h"
@@ -16,4 +16,4 @@ public:
 };
 
 
-#endif //VBOX_VMCLASSLOADERHOOK_H
+#endif //BLACKBOX_VMCLASSLOADERHOOK_H

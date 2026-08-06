@@ -1,3 +1,7 @@
+//
+// Created by Milk on 3/8/21.
+//
+
 #include <jni.h>
 #include "JniHook.h"
 #include "Log.h"
@@ -7,9 +11,11 @@ static struct {
     int api_level;
     unsigned int art_field_size;
     int art_field_flags_offset;
+
     unsigned int art_method_size;
     int art_method_flags_offset;
     int art_method_native_offset;
+
     int class_flags_offset;
 
     jclass method_utils_class;
@@ -20,17 +26,23 @@ static struct {
 } HookEnv;
 
 static const char *GetMethodDesc(JNIEnv *env, jobject javaMethod) {
-    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,HookEnv.get_method_desc_id,javaMethod));
+    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
+                                                                      HookEnv.get_method_desc_id,
+                                                                      javaMethod));
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
 static const char *GetMethodDeclaringClass(JNIEnv *env, jobject javaMethod) {
-    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,HookEnv.get_method_declaring_class_id,javaMethod));
+    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
+                                                                      HookEnv.get_method_declaring_class_id,
+                                                                      javaMethod));
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
 static const char *GetMethodName(JNIEnv *env, jobject javaMethod) {
-    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,HookEnv.get_method_name_id,javaMethod));
+    auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
+                                                                      HookEnv.get_method_name_id,
+                                                                      javaMethod));
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
@@ -97,7 +109,8 @@ bool CheckFlags(void *artMethod) {
     return true;
 }
 
-void JniHook::HookJniFun(JNIEnv *env, jobject java_method, void *new_fun, void **orig_fun, bool is_static) {
+void JniHook::HookJniFun(JNIEnv *env, jobject java_method, void *new_fun,
+                         void **orig_fun, bool is_static) {
     const char *class_name = GetMethodDeclaringClass(env, java_method);
     const char *method_name = GetMethodName(env, java_method);
     const char *sign = GetMethodDesc(env, java_method);
@@ -105,7 +118,8 @@ void JniHook::HookJniFun(JNIEnv *env, jobject java_method, void *new_fun, void *
 }
 
 void
-JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name, const char *sign, void *new_fun, void **orig_fun, bool is_static) {
+JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name, const char *sign,
+                    void *new_fun, void **orig_fun, bool is_static) {
     if (HookEnv.art_method_native_offset == 0) {
         return;
     }
@@ -155,7 +169,8 @@ __attribute__((section (".mytext")))  JNICALL void native_offset2
         (JNIEnv *env, jclass obj) {
 }
 
-__attribute__((section (".mytext")))  JNICALL void set_method_accessible (JNIEnv *env, jclass obj, jclass clazz, jobject method) {
+__attribute__((section (".mytext")))  JNICALL void set_method_accessible
+        (JNIEnv *env, jclass obj, jclass clazz, jobject method) {
     jmethodID methodId = env->FromReflectedMethod(method);
     char *art_method = static_cast<char *>(GetArtMethod(env, clazz, methodId));
     AddAccessFlag(art_method, kAccPublic);
@@ -164,7 +179,8 @@ __attribute__((section (".mytext")))  JNICALL void set_method_accessible (JNIEnv
     }
 }
 
-__attribute__((section (".mytext")))  JNICALL void set_field_accessible (JNIEnv *env, jclass obj, jclass clazz, jobject field) {
+__attribute__((section (".mytext")))  JNICALL void set_field_accessible
+        (JNIEnv *env, jclass obj, jclass clazz, jobject field) {
     char *artField = static_cast<char *>(GetFieldMethod(env, field));
     AddAccessFlag(artField, kAccPublic);
     if (HookEnv.api_level >= __ANDROID_API_Q__) {
@@ -174,10 +190,10 @@ __attribute__((section (".mytext")))  JNICALL void set_field_accessible (JNIEnv 
 }
 
 void registerNative(JNIEnv *env) {
-    jclass clazz = env->FindClass("top/niunaijun/blackbox/jnihook/jni/JniHook");
+    jclass clazz = env->FindClass("com/jnihook/jni/JniHook");
     JNINativeMethod gMethods[] = {
-            {"nativeOffset",  "()V",(void *) native_offset},
-            {"nativeOffset2", "()V",(void *) native_offset2},
+            {"nativeOffset",  "()V",                                            (void *) native_offset},
+            {"nativeOffset2", "()V",                                            (void *) native_offset2},
             {"setAccessible", "(Ljava/lang/Class;Ljava/lang/reflect/Method;)V", (void *) set_method_accessible},
             {"setAccessible", "(Ljava/lang/Class;Ljava/lang/reflect/Field;)V",  (void *) set_field_accessible},
     };
@@ -190,15 +206,17 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     registerNative(env);
     HookEnv.api_level = api_level;
 
-    jclass clazz = env->FindClass("top/niunaijun/blackbox/jnihook/jni/JniHook");
+    jclass clazz = env->FindClass("com/jnihook/jni/JniHook");
     jmethodID nativeOffsetId = env->GetStaticMethodID(clazz, "nativeOffset", "()V");
     jmethodID nativeOffset2Id = env->GetStaticMethodID(clazz, "nativeOffset2", "()V");
 
     jfieldID nativeOffsetFieldId = env->GetStaticFieldID(clazz, "NATIVE_OFFSET", "I");
     jfieldID nativeOffsetField2Id = env->GetStaticFieldID(clazz, "NATIVE_OFFSET_2", "I");
 
-    void *nativeOffsetField = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetFieldId,true));
-    void *nativeOffsetField2 = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetField2Id,true));
+    void *nativeOffsetField = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetFieldId,
+                                                                        true));
+    void *nativeOffsetField2 = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetField2Id,
+                                                                         true));
     HookEnv.art_field_size = (size_t) nativeOffsetField2 - (size_t) nativeOffsetField;
 
     void *nativeOffset = GetArtMethod(env, clazz, nativeOffsetId);
@@ -265,9 +283,13 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
         return;
     }
 
-    HookEnv.method_utils_class = env->FindClass("top/niunaijun/blackbox/jnihook/MethodUtils");
-    HookEnv.get_method_desc_id = env->GetStaticMethodID(HookEnv.method_utils_class, "getDesc","(Ljava/lang/reflect/Method;)Ljava/lang/String;");
-    HookEnv.get_method_declaring_class_id = env->GetStaticMethodID(HookEnv.method_utils_class,"getDeclaringClass","(Ljava/lang/reflect/Method;)Ljava/lang/String;");
-    HookEnv.get_method_name_id = env->GetStaticMethodID(HookEnv.method_utils_class, "getMethodName","(Ljava/lang/reflect/Method;)Ljava/lang/String;");
+    HookEnv.method_utils_class = env->FindClass("com/jnihook/MethodUtils");
+    HookEnv.get_method_desc_id = env->GetStaticMethodID(HookEnv.method_utils_class, "getDesc",
+                                                        "(Ljava/lang/reflect/Method;)Ljava/lang/String;");
+    HookEnv.get_method_declaring_class_id = env->GetStaticMethodID(HookEnv.method_utils_class,
+                                                                   "getDeclaringClass",
+                                                                   "(Ljava/lang/reflect/Method;)Ljava/lang/String;");
+    HookEnv.get_method_name_id = env->GetStaticMethodID(HookEnv.method_utils_class, "getMethodName",
+                                                        "(Ljava/lang/reflect/Method;)Ljava/lang/String;");
 }
 
