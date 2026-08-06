@@ -1,8 +1,8 @@
 package com.Score.fake.service;
 
 import android.os.IBinder;
+import android.os.IInterface;
 
-import black.android.hardware.location.BRIContextHubServiceStub;
 import black.android.os.BRServiceManager;
 import com.Score.fake.hook.BinderInvocationStub;
 import com.Score.fake.service.base.ValueMethodProxy;
@@ -14,35 +14,69 @@ import com.Score.utils.compat.BuildCompat;
 public class IContextHubServiceProxy extends BinderInvocationStub {
 
     public IContextHubServiceProxy() {
-        super(BRServiceManager.get().getService(getServiceName()));
+        super(getServiceBinder());
     }
 
-    private static String getServiceName() {
-        return BuildCompat.isOreo() ? "contexthub" : "contexthub_service";
+    private static IBinder getServiceBinder() {
+        try {
+            String serviceName = BuildCompat.isOreo() ? "contexthub" : "contexthub_service";
+            return BRServiceManager.get().getService(serviceName);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override
     protected Object getWho() {
-        // Safe check to prevent NullPointerException on Android 14-17
-        IBinder binder = BRServiceManager.get().getService(getServiceName());
+        IBinder binder = getServiceBinder();
         if (binder == null) {
             return null;
         }
 
         try {
-            return BRIContextHubServiceStub.get().asInterface(binder);
+            // Try multiple class names for different Android versions
+            String[] classNames = {
+                "android.hardware.location.IContextHubService$Stub",
+                "android.hardware.location.IContextHubService$Stub",
+                "android.hardware.IContextHubService$Stub"
+            };
+
+            for (String className : classNames) {
+                try {
+                    Class<?> stubClass = Class.forName(className);
+                    java.lang.reflect.Method asInterface = stubClass.getMethod("asInterface", IBinder.class);
+                    Object result = asInterface.invoke(null, binder);
+                    if (result != null) {
+                        return result;
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Try next class name
+                } catch (Throwable t) {
+                    // Try next class name
+                }
+            }
+
+            // Return binder as fallback
+            return binder;
+
         } catch (Throwable t) {
-            // Catch reflection/stub changes on newer Android versions
-            return null;
+            return binder;
         }
     }
 
     @Override
     protected void inject(Object baseInvocation, Object proxyInvocation) {
-        // Only attempt replacement if valid service instance exists
         if (getWho() != null) {
-            replaceSystemService(getServiceName());
+            try {
+                replaceSystemService(getServiceName());
+            } catch (Throwable t) {
+                // Silent fail
+            }
         }
+    }
+
+    private String getServiceName() {
+        return BuildCompat.isOreo() ? "contexthub" : "contexthub_service";
     }
 
     @Override
