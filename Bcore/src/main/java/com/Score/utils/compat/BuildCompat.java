@@ -15,66 +15,94 @@ public class BuildCompat {
         return 0;
     }
 
-    // Android 16 (Android 15) - 'Red Velvet Cake' (Expected version for Android 15)
-    public static boolean isV() {
-        return Build.VERSION.SDK_INT >= 35 || (Build.VERSION.SDK_INT >= 34 && Build.VERSION.PREVIEW_SDK_INT == 1);
+    // ============================================================
+    // ANDROID 14+ SUPPORT (UpsideDownCake API 34+)
+    // ============================================================
+    
+    public static boolean isAndroid17() {
+        return Build.VERSION.SDK_INT >= 37;
     }
     
-    //Android 15 (Android 14) - 'Upside Down Cake' (Expected version for Android 14)
-    public static boolean isU() {
-        return Build.VERSION.SDK_INT >= 34 || (Build.VERSION.SDK_INT >= 33 && Build.VERSION.PREVIEW_SDK_INT == 1);
+    public static boolean isAndroid16() {
+        return Build.VERSION.SDK_INT >= 36;
+    }
+    
+    public static boolean isAndroid15() {
+        return Build.VERSION.SDK_INT >= 35 || (Build.VERSION.SDK_INT >= 34 && Build.VERSION.PREVIEW_SDK_INT >= 1);
+    }
+    
+    public static boolean isAndroid14() {
+        return Build.VERSION.SDK_INT >= 34 || (Build.VERSION.SDK_INT >= 33 && Build.VERSION.PREVIEW_SDK_INT >= 1);
+    }
+    
+    public static boolean isAndroid13() {
+        return Build.VERSION.SDK_INT >= 33 || (Build.VERSION.SDK_INT >= 32 && Build.VERSION.PREVIEW_SDK_INT >= 1);
+    }
+    
+    public static boolean isAndroid12() {
+        return Build.VERSION.SDK_INT >= 31 || (Build.VERSION.SDK_INT >= 30 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // Android 13 (Tiramisu)
-	public static boolean isT() {
-		return Build.VERSION.SDK_INT >= 33 || (Build.VERSION.SDK_INT >= 31 && Build.VERSION.PREVIEW_SDK_INT == 1);
-	}
-
-    // 12
-    public static boolean isS() {
-        return Build.VERSION.SDK_INT >= 31 || (Build.VERSION.SDK_INT >= 30 && Build.VERSION.PREVIEW_SDK_INT == 1);
+    public static boolean isAndroid11() {
+        return Build.VERSION.SDK_INT >= 30 || (Build.VERSION.SDK_INT >= 29 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 11
-    public static boolean isR() {
-        return Build.VERSION.SDK_INT >= 30 || (Build.VERSION.SDK_INT >= 29 && Build.VERSION.PREVIEW_SDK_INT == 1);
+    public static boolean isAndroid10() {
+        return Build.VERSION.SDK_INT >= 29 || (Build.VERSION.SDK_INT >= 28 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 10
-    public static boolean isQ() {
-        return Build.VERSION.SDK_INT >= 29 || (Build.VERSION.SDK_INT >= 28 && Build.VERSION.PREVIEW_SDK_INT == 1);
-    }
-
-    // 9
     public static boolean isPie() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || (Build.VERSION.SDK_INT >= 27 && Build.VERSION.PREVIEW_SDK_INT == 1);
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P || (Build.VERSION.SDK_INT >= 27 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 8
     public static boolean isOreo() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O || (Build.VERSION.SDK_INT >= 25 && Build.VERSION.PREVIEW_SDK_INT == 1);
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O || (Build.VERSION.SDK_INT >= 25 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 7.1
+    // ============================================================
+    // UTILITY METHODS
+    // ============================================================
+    
+    public static boolean isAndroid14OrAbove() {
+        return isAndroid14() || isAndroid15() || isAndroid16() || isAndroid17();
+    }
+    
+    public static boolean isAndroid13OrAbove() {
+        return isAndroid13() || isAndroid14OrAbove();
+    }
+    
+    public static boolean isAndroid12OrAbove() {
+        return isAndroid12() || isAndroid13OrAbove();
+    }
+    
+    public static boolean isAndroid11OrAbove() {
+        return isAndroid11() || isAndroid12OrAbove();
+    }
+    
+    public static boolean isAndroid10OrAbove() {
+        return isAndroid10() || isAndroid11OrAbove();
+    }
+
     public static boolean isN_MR1() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1 || (Build.VERSION.SDK_INT >= 24 && Build.VERSION.PREVIEW_SDK_INT == 1);
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1 || (Build.VERSION.SDK_INT >= 24 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 7
     public static boolean isN() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N || (Build.VERSION.SDK_INT >= 23 && Build.VERSION.PREVIEW_SDK_INT == 1);
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N || (Build.VERSION.SDK_INT >= 23 && Build.VERSION.PREVIEW_SDK_INT >= 1);
     }
 
-    // 6
     public static boolean isM() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
     }
 
-    // 5
     public static boolean isL() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
     }
 
+    // ============================================================
+    // OEM DETECTION
+    // ============================================================
+    
     public static boolean isSamsung() {
         return "samsung".equalsIgnoreCase(Build.BRAND) || "samsung".equalsIgnoreCase(Build.MANUFACTURER);
     }
@@ -112,7 +140,6 @@ public class BuildCompat {
     public static boolean isVivo() {
         return SystemPropertiesCompat.isExist("ro.vivo.os.build.display.id");
     }
-
 
     private static ROMType sRomType;
 
