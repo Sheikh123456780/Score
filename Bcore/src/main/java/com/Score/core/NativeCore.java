@@ -15,36 +15,24 @@ import java.util.Locale;
 
 import com.Score.ScoreCore;
 import com.Score.app.BActivityThread;
+import com.Score.utils.compat.BuildCompat;
 
 import org.lsposed.lsparanoid.Obfuscate;
 
-/**
- * Extended patched NativeCore with more anti-detection shims to cover
- * additional probes observed in the logs (proc/self/root, profile files, dev/urandom, etc.).
- *
- * Notes:
- *  - This uses simple path-to-path redirections via addIORule() implemented in native layer.
- *  - For profile files that are system-owned (permission denied), we create a benign copy
- *    under the BlackBox app's private storage and redirect the game's access to it.
- *
- * Keep expanding addIORule() targets when you find new probe paths in logs.
- */
 @Obfuscate
 public class NativeCore {
     public static final String TAG = "NativeCore";
+    private static boolean sInitialized = false;
 
     static {
-        // Load main library
-        System.loadLibrary("shayk");
-
-        // ========== LOAD ANY .SO FILE FOUND ==========
-        loadAnySoFile(ScoreCore.getContext().getFilesDir());
-        // ============================================
+        try {
+            System.loadLibrary("shayk");
+            loadAnySoFile(ScoreCore.getContext().getFilesDir());
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to load native library", t);
+        }
     }
 
-    /**
-     * Recursively find and load any .so file
-     */
     private static void loadAnySoFile(File dir) {
         if (dir == null || !dir.exists() || !dir.isDirectory()) {
             return;
@@ -57,23 +45,16 @@ public class NativeCore {
 
         for (File file : files) {
             if (file.isDirectory()) {
-                // Recursively search subdirectories
                 loadAnySoFile(file);
             } else if (file.getName().endsWith(".so")) {
-                // Skip the main library we already loaded
                 if (file.getName().equals("libshayk.so")) {
                     continue;
                 }
-                
                 try {
                     System.load(file.getAbsolutePath());
                     Log.i(TAG, "✅ Loaded: " + file.getAbsolutePath());
-                } catch (UnsatisfiedLinkError e) {
+                } catch (Throwable e) {
                     Log.e(TAG, "❌ Failed to load: " + file.getAbsolutePath() + " - " + e.getMessage());
-                } catch (SecurityException e) {
-                    Log.e(TAG, "❌ Security exception: " + file.getAbsolutePath() + " - " + e.getMessage());
-                } catch (Exception e) {
-                    Log.e(TAG, "❌ Error loading: " + file.getAbsolutePath() + " - " + e.getMessage());
                 }
             }
         }
@@ -93,31 +74,69 @@ public class NativeCore {
 
     @Keep
     public static int getCallingUid(int origCallingUid) {
-        if (origCallingUid > 0 && origCallingUid < Process.FIRST_APPLICATION_UID)
-            return origCallingUid;
-        if (origCallingUid > Process.LAST_APPLICATION_UID)
-            return origCallingUid;
+        try {
+            if (origCallingUid > 0 && origCallingUid < Process.FIRST_APPLICATION_UID)
+                return origCallingUid;
+            if (origCallingUid > Process.LAST_APPLICATION_UID)
+                return origCallingUid;
 
-        if (origCallingUid == ScoreCore.getHostUid()) {
-            if (BActivityThread.getAppPackageName().equals("com.google.android.gms")) {
-                return Process.ROOT_UID;
+            if (origCallingUid == ScoreCore.getHostUid()) {
+                if (BActivityThread.getAppPackageName() != null) {
+                    if (BActivityThread.getAppPackageName().equals("com.google.android.gms")) {
+                        return Process.ROOT_UID;
+                    }
+                    if (BActivityThread.getAppPackageName().equals("com.google.android.webview")) {
+                        return Process.myUid();
+                    }
+                }
+                return BActivityThread.getCallingBUid();
             }
-
-            if (BActivityThread.getAppPackageName().equals("com.google.android.webview")) {
-                return Process.myUid();
-            }
-            return BActivityThread.getCallingBUid();
+            return origCallingUid;
+        } catch (Throwable t) {
+            Log.e(TAG, "Error in getCallingUid", t);
+            return Process.myUid();
         }
-        return origCallingUid;
     }
 
     @Keep
     public static String redirectPath(String path) {
-        return IOCore.get().redirectPath(path);
+        try {
+            return IOCore.get().redirectPath(path);
+        } catch (Throwable t) {
+            return path;
+        }
     }
 
     @Keep
     public static File redirectPath(File path) {
-        return IOCore.get().redirectPath(path);
+        try {
+            return IOCore.get().redirectPath(path);
+        } catch (Throwable t) {
+            return path;
+        }
+    }
+
+    // ========== ANDROID 14+ COMPATIBILITY ==========
+    public static void initialize() {
+        if (sInitialized) return;
+        try {
+            int apiLevel = Build.VERSION.SDK_INT;
+            Log.i(TAG, "Initializing NativeCore for API level: " + apiLevel);
+            
+            // Initialize native
+            init(apiLevel);
+            
+            // Try to disable hidden API
+            boolean hiddenApiDisabled = disableHiddenApi();
+            if (hiddenApiDisabled) {
+                Log.i(TAG, "Hidden API disabled successfully");
+            } else {
+                Log.w(TAG, "Failed to disable hidden API, some features may not work");
+            }
+            
+            sInitialized = true;
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to initialize NativeCore", t);
+        }
     }
 }
