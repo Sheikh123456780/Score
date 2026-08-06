@@ -4,11 +4,14 @@
 //
 
 #include <jni.h>
+#include <cstring>
+#include <algorithm>
+#include <dlfcn.h>
+#include <unistd.h>
+
 #include "JniHook.h"
 #include "Log.h"
 #include "ArtMethod.h"
-#include <dlfcn.h>
-#include <unistd.h>
 
 static struct {
     int api_level;
@@ -392,7 +395,9 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     // If not found, try searching the entire method structure
     if (HookEnv.art_method_native_offset == -1 && nativeOffset != nullptr) {
         auto artMethod = reinterpret_cast<uintptr_t *>(nativeOffset);
-        int methodSize = std::min(64, (int)(HookEnv.art_method_size / sizeof(uintptr_t)));
+        int methodSize = HookEnv.art_method_size / sizeof(uintptr_t);
+        // Use min to avoid overflow
+        if (methodSize > 64) methodSize = 64;
         
         for (int i = 0; i < methodSize; ++i) {
             void* ptr = reinterpret_cast<void *>(artMethod[i]);
