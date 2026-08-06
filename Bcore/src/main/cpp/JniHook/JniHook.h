@@ -1,11 +1,14 @@
+
 //
 // Created by Milk on 3/8/21.
+// Modified for Android 9-17 Support
 //
 
 #ifndef VIRTUAL_APP_JNIHOOK_H
 #define VIRTUAL_APP_JNIHOOK_H
 
 #include "ArtMethod.h"
+#include <jni.h>
 
 #define HOOK_JNI(ret, func, ...) \
   ret (*orig_##func)(__VA_ARGS__); \
@@ -17,7 +20,10 @@ public:
     static void HookJniFun(JNIEnv *env, const char *class_name, const char *method_name, const char *sign, void * new_fun, void ** orig_fun,
                            bool is_static);
     static void HookJniFun(JNIEnv *env, jobject java_method, void *new_fun, void **orig_fun, bool is_static);
-    static bool isInitialized() { return HookEnv.is_initialized; }
+    
+    // Removed the inline function that referenced HookEnv
+    // Use a global flag instead
+    static bool isInitialized();
 };
 
 #endif //VIRTUAL_APP_JNIHOOK_H
