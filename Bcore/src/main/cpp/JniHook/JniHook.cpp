@@ -30,23 +30,35 @@ static struct {
 } HookEnv;
 
 static const char *GetMethodDesc(JNIEnv *env, jobject javaMethod) {
+    if (HookEnv.method_utils_class == nullptr || HookEnv.get_method_desc_id == nullptr) {
+        return "";
+    }
     auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
                                                                       HookEnv.get_method_desc_id,
                                                                       javaMethod));
+    if (desc == nullptr) return "";
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
 static const char *GetMethodDeclaringClass(JNIEnv *env, jobject javaMethod) {
+    if (HookEnv.method_utils_class == nullptr || HookEnv.get_method_declaring_class_id == nullptr) {
+        return "";
+    }
     auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
                                                                       HookEnv.get_method_declaring_class_id,
                                                                       javaMethod));
+    if (desc == nullptr) return "";
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
 static const char *GetMethodName(JNIEnv *env, jobject javaMethod) {
+    if (HookEnv.method_utils_class == nullptr || HookEnv.get_method_name_id == nullptr) {
+        return "";
+    }
     auto desc = reinterpret_cast<jstring>(env->CallStaticObjectMethod(HookEnv.method_utils_class,
                                                                       HookEnv.get_method_name_id,
                                                                       javaMethod));
+    if (desc == nullptr) return "";
     return env->GetStringUTFChars(desc, JNI_FALSE);
 }
 
@@ -88,7 +100,6 @@ static void *GetArtMethod(JNIEnv *env, jclass clazz, jmethodID methodId) {
         jclass executable = env->FindClass("java/lang/reflect/Executable");
         if (executable == nullptr) {
             env->ExceptionClear();
-            // Fallback for Android 14+
             return methodId;
         }
         jfieldID artId = env->GetFieldID(executable, "artMethod", "J");
@@ -308,13 +319,19 @@ static void* GetArtMethodAlternative(JNIEnv* env, jclass clazz, jmethodID method
 void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     if (HookEnv.is_initialized) return;
     
+    // Zero out the struct
+    memset(&HookEnv, 0, sizeof(HookEnv));
+    HookEnv.art_method_flags_offset = -1;
+    HookEnv.art_method_native_offset = -1;
+    HookEnv.art_field_flags_offset = -1;
+    
     registerNative(env);
     HookEnv.api_level = api_level;
-    HookEnv.is_initialized = true;
 
     jclass clazz = env->FindClass("com/jnihook/jni/JniHook");
     if (clazz == nullptr) {
         ALOGE("Failed to find JniHook class");
+        HookEnv.is_initialized = true;
         return;
     }
     
@@ -327,6 +344,7 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     if (nativeOffsetId == nullptr || nativeOffset2Id == nullptr || 
         nativeOffsetFieldId == nullptr || nativeOffsetField2Id == nullptr) {
         ALOGE("Failed to find native methods/fields");
+        HookEnv.is_initialized = true;
         return;
     }
 
@@ -488,5 +506,13 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
         ALOGE("Failed to find MethodUtils class");
     }
     
+    HookEnv.is_initialized = true;
     ALOGD("JniHook initialized for API level: %d", api_level);
+}
+
+// ============================================================
+// isInitialized implementation
+// ============================================================
+bool JniHook::isInitialized() {
+    return HookEnv.is_initialized;
 }
