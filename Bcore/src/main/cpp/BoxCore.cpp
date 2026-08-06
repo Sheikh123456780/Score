@@ -94,6 +94,7 @@ void nativeHook(JNIEnv *env) {
     VMClassLoaderHook::init(env);
     BinderHook::init(env);
     DexFileHook::init(env);
+    RuntimeHook::init(env);
 }
 
 void hideXposed(JNIEnv *env, jclass clazz) {
@@ -109,6 +110,7 @@ void init(JNIEnv *env, jobject clazz, jint api_level) {
     
     ALOGD("NativeCore init on API level: %d", api_level);
     VMEnv.api_level = api_level;
+    JniHook::InitJniHook(env, api_level);
     VMEnv.NativeCoreClass = (jclass) env->NewGlobalRef(env->FindClass(VMCORE_CLASS));
     
     if (VMEnv.NativeCoreClass == nullptr) {
