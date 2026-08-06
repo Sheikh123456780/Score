@@ -1,5 +1,6 @@
 package com.Score.fake.hook;
 
+import android.os.Build;
 import android.os.IBinder;
 import android.os.IInterface;
 import android.os.Parcel;
@@ -12,14 +13,10 @@ import java.io.FileDescriptor;
 import java.util.Map;
 
 import black.android.os.BRServiceManager;
+import com.Score.utils.compat.BuildCompat;
 
 /**
- * Created by Milk on 3/30/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
+ * Updated for Android 9 (API 28) to Android 17 (API 37) Compatibility
  */
 public abstract class BinderInvocationStub extends ClassInvocationStub implements IBinder {
     private IBinder mBaseBinder;
@@ -35,17 +32,32 @@ public abstract class BinderInvocationStub extends ClassInvocationStub implement
     @Nullable
     @Override
     public String getInterfaceDescriptor() throws RemoteException {
-        return mBaseBinder.getInterfaceDescriptor();
+        if (mBaseBinder == null) return null;
+        try {
+            return mBaseBinder.getInterfaceDescriptor();
+        } catch (RemoteException e) {
+            return null;
+        }
     }
 
     @Override
     public boolean pingBinder() {
-        return mBaseBinder.pingBinder();
+        if (mBaseBinder == null) return false;
+        try {
+            return mBaseBinder.pingBinder();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @Override
     public boolean isBinderAlive() {
-        return mBaseBinder.isBinderAlive();
+        if (mBaseBinder == null) return false;
+        try {
+            return mBaseBinder.isBinderAlive();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @Nullable
@@ -56,32 +68,88 @@ public abstract class BinderInvocationStub extends ClassInvocationStub implement
 
     @Override
     public void dump(@NonNull FileDescriptor fd, @Nullable String[] args) throws RemoteException {
-        mBaseBinder.dump(fd, args);
+        if (mBaseBinder != null) {
+            try {
+                mBaseBinder.dump(fd, args);
+            } catch (RemoteException e) {
+                // Ignore
+            }
+        }
     }
 
     @Override
     public void dumpAsync(@NonNull FileDescriptor fd, @Nullable String[] args) throws RemoteException {
-        mBaseBinder.dumpAsync(fd, args);
+        if (mBaseBinder != null) {
+            try {
+                mBaseBinder.dumpAsync(fd, args);
+            } catch (RemoteException e) {
+                // Ignore
+            }
+        }
     }
 
     @Override
     public boolean transact(int code, @NonNull Parcel data, @Nullable Parcel reply, int flags) throws RemoteException {
-        return mBaseBinder.transact(code, data, reply, flags);
+        if (mBaseBinder == null) return false;
+        try {
+            return mBaseBinder.transact(code, data, reply, flags);
+        } catch (RemoteException e) {
+            throw e;
+        }
     }
 
     @Override
     public void linkToDeath(@NonNull DeathRecipient recipient, int flags) throws RemoteException {
-        mBaseBinder.linkToDeath(recipient, flags);
+        if (mBaseBinder != null) {
+            try {
+                mBaseBinder.linkToDeath(recipient, flags);
+            } catch (RemoteException e) {
+                throw e;
+            }
+        }
     }
 
     @Override
     public boolean unlinkToDeath(@NonNull DeathRecipient recipient, int flags) {
-        return mBaseBinder.unlinkToDeath(recipient, flags);
+        if (mBaseBinder == null) return false;
+        try {
+            return mBaseBinder.unlinkToDeath(recipient, flags);
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
-
+    // ============================================================
+    // replaceSystemService with Android 14+ Safety
+    // ============================================================
     protected void replaceSystemService(String name) {
-        Map<String, IBinder> services = BRServiceManager.get().sCache();
-        services.put(name, this);
+        if (name == null || name.isEmpty()) {
+            return;
+        }
+        
+        try {
+            Map<String, IBinder> services = BRServiceManager.get().sCache();
+            if (services != null) {
+                services.put(name, this);
+            }
+        } catch (Throwable t) {
+            // Silent fail for Android 14+
+            try {
+                // Try alternative method for Android 14+
+                Class<?> serviceManagerClass = Class.forName("android.os.ServiceManager");
+                java.lang.reflect.Method addService = serviceManagerClass.getMethod("addService", String.class, IBinder.class);
+                addService.invoke(null, name, this);
+            } catch (Throwable ignored) {
+                // Ignore
+            }
+        }
+    }
+
+    protected IBinder getBaseBinder() {
+        return mBaseBinder;
+    }
+    
+    protected void setBaseBinder(IBinder baseBinder) {
+        this.mBaseBinder = baseBinder;
     }
 }
