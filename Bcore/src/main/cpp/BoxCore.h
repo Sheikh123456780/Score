@@ -26,5 +26,4 @@ public:
     static jlongArray loadEmptyDex(JNIEnv *env);
 };
 
-
 #endif //VIRTUALM_VMCORE_H
