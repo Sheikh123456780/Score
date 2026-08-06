@@ -458,7 +458,7 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     }
 
     if (HookEnv.art_method_flags_offset == -1) {
-        ALOGW("art_method_flags_offset not found! Disable ArtMethod flags.");
+        ALOGD("art_method_flags_offset not found! Disable ArtMethod flags.");
         HookEnv.art_method_flags_offset = 0;
     }
 
