@@ -1,28 +1,43 @@
 package com.Score.fake.service;
 
+import android.os.Build;
+import android.os.IBinder;
+import android.os.IInterface;
 
 import black.android.os.BRServiceManager;
-import black.android.view.BRIAutoFillManagerStub;
 import com.Score.fake.hook.BinderInvocationStub;
 
-/**
- * @author Findger
- * @function
- * @date :2022/4/2 21:59
- **/
+import java.lang.reflect.Method;
+
 public class ISystemUpdateProxy extends BinderInvocationStub {
+
     public ISystemUpdateProxy() {
         super(BRServiceManager.get().getService("system_update"));
     }
 
     @Override
     protected Object getWho() {
-        return BRIAutoFillManagerStub.get().asInterface(BRServiceManager.get().getService("system_update"));
+        IBinder binder = BRServiceManager.get().getService("system_update");
+        if (binder == null) {
+            return null;
+        }
+
+        try {
+            // Dynamic resolution based on API version targeting system update stubs
+            Class<?> stubClass = Class.forName("android.os.ISystemUpdateManager$Stub");
+            Method asInterfaceMethod = stubClass.getMethod("asInterface", IBinder.class);
+            return asInterfaceMethod.invoke(null, binder);
+        } catch (Throwable t) {
+            // Fallback generic proxy for non-standard OEM implementations
+            return binder;
+        }
     }
 
     @Override
     protected void inject(Object baseInvocation, Object proxyInvocation) {
-        replaceSystemService("system_update");
+        if (getWho() != null) {
+            replaceSystemService("system_update");
+        }
     }
 
     @Override
