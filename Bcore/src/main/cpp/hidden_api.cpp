@@ -6,6 +6,19 @@
 #include "Log.h"
 #include "SandHook/ElfImg.h"
 
+// ============================================================
+// LOG MACROS - Using your existing Log.h
+// ============================================================
+// Aapke Log.h mein ALOGE aur ALOGD already define hain
+// Agar LOGI/LOGE nahi hain toh yeh define karein:
+#ifndef LOGI
+#define LOGI(...) ALOGD(__VA_ARGS__)
+#endif
+
+#ifndef LOGE
+#define LOGE(...) ALOGE(__VA_ARGS__)
+#endif
+
 int get_android_api_level() {
     char sdk_ver_str[PROP_VALUE_MAX] = {0};
     if (__system_property_get("ro.build.version.sdk", sdk_ver_str)) {
@@ -50,7 +63,7 @@ bool disable_hidden_api_native(JNIEnv *env) {
                 func(env, stringClass, args);
                 
                 if (!env->ExceptionCheck()) {
-                    LOGI("Hidden API disabled via native hook: %s", symbol_names[i]);
+                    ALOGD("Hidden API disabled via native hook: %s", symbol_names[i]);
                     return true;
                 }
                 env->ExceptionClear();
@@ -111,7 +124,7 @@ bool disable_hidden_api_reflection(JNIEnv *env) {
             env->CallVoidMethod(runtime_inst, set_exemptions, exemptions);
             
             if (!env->ExceptionCheck()) {
-                LOGI("Hidden API disabled via reflection on API %d", api_level);
+                ALOGD("Hidden API disabled via reflection on API %d", api_level);
                 return true;
             }
             env->ExceptionClear();
@@ -122,9 +135,9 @@ bool disable_hidden_api_reflection(JNIEnv *env) {
     if (api_level >= 36) {
         jmethodID set_policy = env->GetMethodID(vm_runtime_cls, "setHiddenApiPolicy", "(I)V");
         if (set_policy != nullptr) {
-            env->CallVoidMethod(runtime_inst, set_policy, 0); // 0 = no restrictions
+            env->CallVoidMethod(runtime_inst, set_policy, 0);
             if (!env->ExceptionCheck()) {
-                LOGI("Hidden API disabled via setHiddenApiPolicy on API %d", api_level);
+                ALOGD("Hidden API disabled via setHiddenApiPolicy on API %d", api_level);
                 return true;
             }
             env->ExceptionClear();
@@ -141,7 +154,7 @@ bool disable_hidden_api(JNIEnv *env) {
     if (env == nullptr) return false;
 
     int api_level = get_android_api_level();
-    LOGI("Attempting to disable hidden API on API level: %d", api_level);
+    ALOGD("Attempting to disable hidden API on API level: %d", api_level);
 
     // API 28-33: Native hooking
     if (api_level >= 28 && api_level <= 33) {
@@ -173,7 +186,7 @@ bool disable_hidden_api(JNIEnv *env) {
                         if (exemptions != nullptr) {
                             env->SetObjectField(runtime_inst, exemptionsField, exemptions);
                             if (!env->ExceptionCheck()) {
-                                LOGI("Hidden API disabled via field access on API %d", api_level);
+                                ALOGD("Hidden API disabled via field access on API %d", api_level);
                                 return true;
                             }
                             env->ExceptionClear();
@@ -184,6 +197,6 @@ bool disable_hidden_api(JNIEnv *env) {
         }
     }
 
-    LOGE("Failed to disable hidden API on API %d", api_level);
+    ALOGE("Failed to disable hidden API on API %d", api_level);
     return false;
 }
