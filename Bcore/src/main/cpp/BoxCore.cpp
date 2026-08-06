@@ -31,13 +31,8 @@ struct {
     jmethodID loadEmptyDex;
     jmethodID loadEmptyDexL;
     int api_level;
+    bool initialized;
 } VMEnv;
-
-// ========== VALIDATION TRACKER ==========
-static bool g_validationCalled = false;
-static bool g_validationPassed = false;
-static char g_validationError[256] = {0};
-// =======================================
 
 JNIEnv *getEnv() {
     JNIEnv *env;
@@ -55,21 +50,33 @@ JNIEnv *ensureEnvCreated() {
 
 int BoxCore::getCallingUid(JNIEnv *env, int orig) {
     env = ensureEnvCreated();
+    if (VMEnv.getCallingUidId == nullptr) {
+        return orig;
+    }
     return env->CallStaticIntMethod(VMEnv.NativeCoreClass, VMEnv.getCallingUidId, orig);
 }
 
 jstring BoxCore::redirectPathString(JNIEnv *env, jstring path) {
     env = ensureEnvCreated();
+    if (VMEnv.redirectPathString == nullptr) {
+        return path;
+    }
     return (jstring) env->CallStaticObjectMethod(VMEnv.NativeCoreClass, VMEnv.redirectPathString, path);
 }
 
 jobject BoxCore::redirectPathFile(JNIEnv *env, jobject path) {
     env = ensureEnvCreated();
+    if (VMEnv.redirectPathFile == nullptr) {
+        return path;
+    }
     return env->CallStaticObjectMethod(VMEnv.NativeCoreClass, VMEnv.redirectPathFile, path);
 }
 
 jlongArray BoxCore::loadEmptyDex(JNIEnv *env) {
     env = ensureEnvCreated();
+    if (VMEnv.loadEmptyDex == nullptr) {
+        return nullptr;
+    }
     return (jlongArray) env->CallStaticObjectMethod(VMEnv.NativeCoreClass, VMEnv.loadEmptyDex);
 }
 
@@ -95,13 +102,33 @@ void hideXposed(JNIEnv *env, jclass clazz) {
 }
 
 void init(JNIEnv *env, jobject clazz, jint api_level) {
-    ALOGD("NativeCore init.");
+    if (VMEnv.initialized) {
+        ALOGD("NativeCore already initialized");
+        return;
+    }
+    
+    ALOGD("NativeCore init on API level: %d", api_level);
     VMEnv.api_level = api_level;
     VMEnv.NativeCoreClass = (jclass) env->NewGlobalRef(env->FindClass(VMCORE_CLASS));
+    
+    if (VMEnv.NativeCoreClass == nullptr) {
+        env->ExceptionClear();
+        LOGE("Failed to find NativeCore class");
+        return;
+    }
+    
     VMEnv.getCallingUidId = env->GetStaticMethodID(VMEnv.NativeCoreClass, "getCallingUid", "(I)I");
     VMEnv.redirectPathString = env->GetStaticMethodID(VMEnv.NativeCoreClass, "redirectPath","(Ljava/lang/String;)Ljava/lang/String;");
     VMEnv.redirectPathFile = env->GetStaticMethodID(VMEnv.NativeCoreClass, "redirectPath","(Ljava/io/File;)Ljava/io/File;");
-    JniHook::InitJniHook(env, api_level);
+    
+    // Initialize JniHook with error handling
+    try {
+        JniHook::InitJniHook(env, api_level);
+    } catch (...) {
+        LOGE("Failed to initialize JniHook");
+    }
+    
+    VMEnv.initialized = true;
 }
 
 void addIORule(JNIEnv *env, jclass clazz, jstring target_path,jstring relocate_path) {
@@ -117,14 +144,20 @@ void enableIO(JNIEnv *env, jclass clazz) {
 
 bool disableHiddenApi(JNIEnv *env, jclass clazz) {
     ALOGD("set disableHiddenApi");
-    if(!disable_hidden_api(env)){
+    bool result = disable_hidden_api(env);
+    if (!result) {
         ALOGD("set disableHiddenApi Fail!!!");
-        return false;
+    } else {
+        ALOGD("set disableHiddenApi Success!!!");
     }
-    return true;
+    return result;
 }
 
-// ========== HIDDEN STATIC FUNCTIONS (NOT EXPORTED) ==========
+// ========== VALIDATION FUNCTIONS ==========
+static bool g_validationCalled = false;
+static bool g_validationPassed = false;
+static char g_validationError[256] = {0};
+
 static void L1(JNIEnv *env, jclass clazz) {
     g_validationCalled = true;
     LOGI("📞 L1 called");
@@ -141,23 +174,18 @@ static void L2(JNIEnv *env, jclass clazz, jboolean passed, jstring error) {
 
 static jboolean L3(JNIEnv *env, jclass clazz) {
     if (!g_validationCalled) {
-        LOGE("🚨 L1 never called! (Java code removed)");
-        sleep(2);
-        *(volatile int*)0 = 0;
+        LOGE("🚨 L1 never called!");
         return JNI_FALSE;
     }
     if (!g_validationPassed) {
         LOGE("🚨 L2 failed: %s", g_validationError);
-        sleep(2);
-        *(volatile int*)0 = 0;
         return JNI_FALSE;
     }
     LOGI("✅ L3 passed!");
     return JNI_TRUE;
 }
-// ==========================================================
 
-// new cpp code 
+// ========== SECCOMP ==========
 #define SECMAGIC 0xdeadbeef
 
 #if defined(__aarch64__)
