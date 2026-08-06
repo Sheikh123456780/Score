@@ -64,7 +64,9 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
 
             int sdkInt = Build.VERSION.SDK_INT;
             
-            // Android 14+: Try 4-parameter method via reflection
+            // ============================================================
+            // ANDROID 14+ (API 34-37+): Use reflection for 4-parameter method
+            // ============================================================
             if (sdkInt >= 34) {
                 try {
                     Class<?> binderSessionClass = Class.forName("android.app.IBinderSession");
@@ -77,30 +79,26 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
                 }
             }
 
-            // Android 9-13: Try 3-parameter method
-            if (sdkInt >= 28) {
-                try {
-                    if (BuildCompat.isOreo()) {
-                        IServiceConnectionO.get(mConn).connected(mComponentName, service, dead);
-                        return;
-                    }
-                } catch (Throwable t) {
-                    // Fall through
-                }
-
-                try {
-                    Method method = mConn.getClass().getMethod("connected", 
-                        ComponentName.class, IBinder.class, boolean.class);
-                    method.invoke(mConn, mComponentName, service, dead);
-                    return;
-                } catch (Throwable t) {
-                    // Fall through
-                }
+            // ============================================================
+            // ANDROID 9-13 (API 28-33): Use 3-parameter method
+            // ============================================================
+            try {
+                Method method = mConn.getClass().getMethod("connected", 
+                    ComponentName.class, IBinder.class, boolean.class);
+                method.invoke(mConn, mComponentName, service, dead);
+                return;
+            } catch (NoSuchMethodException e) {
+                // Fall through
+            } catch (Throwable t) {
+                // Fall through
             }
 
-            // Ultimate fallback
+            // ============================================================
+            // ULTIMATE FALLBACK: 2-parameter method
+            // ============================================================
             try {
-                Method method = mConn.getClass().getMethod("connected", ComponentName.class, IBinder.class);
+                Method method = mConn.getClass().getMethod("connected", 
+                    ComponentName.class, IBinder.class);
                 method.invoke(mConn, mComponentName, service);
             } catch (Throwable t) {
                 try {
