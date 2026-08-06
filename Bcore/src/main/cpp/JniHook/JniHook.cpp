@@ -66,23 +66,25 @@ static const char *GetMethodName(JNIEnv *env, jobject javaMethod) {
 }
 
 inline static uint32_t GetAccessFlags(const char *art_method) {
-    if (HookEnv.art_method_flags_offset < 0) return 0;
+    if (HookEnv.art_method_flags_offset <= 0) return 0;
     return *reinterpret_cast<const uint32_t *>(art_method + HookEnv.art_method_flags_offset);
 }
 
 inline static bool SetAccessFlags(char *art_method, uint32_t flags) {
-    if (HookEnv.art_method_flags_offset < 0) return false;
+    if (HookEnv.art_method_flags_offset <= 0) return false;
     *reinterpret_cast<uint32_t *>(art_method + HookEnv.art_method_flags_offset) = flags;
     return true;
 }
 
 inline static bool AddAccessFlag(char *art_method, uint32_t flag) {
+    if (HookEnv.art_method_flags_offset <= 0) return false;
     uint32_t old_flag = GetAccessFlags(art_method);
     uint32_t new_flag = old_flag | flag;
     return new_flag != old_flag && SetAccessFlags(art_method, new_flag);
 }
 
 inline static bool ClearAccessFlag(char *art_method, uint32_t flag) {
+    if (HookEnv.art_method_flags_offset <= 0) return false;
     uint32_t old_flag = GetAccessFlags(art_method);
     uint32_t new_flag = old_flag & ~flag;
     return new_flag != old_flag && SetAccessFlags(art_method, new_flag);
@@ -456,17 +458,8 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     }
 
     if (HookEnv.art_method_flags_offset == -1) {
-        // Try to find using known offset patterns
-        if (api_level >= 36) { // Android 16+
-            HookEnv.art_method_flags_offset = 4;
-        } else if (api_level >= 34) { // Android 14+
-            HookEnv.art_method_flags_offset = 4;
-        } else if (api_level >= 33) { // Android 13
-            HookEnv.art_method_flags_offset = 4;
-        } else {
-            HookEnv.art_method_flags_offset = 4;
-        }
-        ALOGD("Using default flags offset: %d", HookEnv.art_method_flags_offset);
+        ALOGW("art_method_flags_offset not found! Disable ArtMethod flags.");
+        HookEnv.art_method_flags_offset = 0;
     }
 
     // ========== FIND FIELD FLAGS OFFSET ==========
