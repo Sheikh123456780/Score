@@ -11,7 +11,6 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import black.android.app.IServiceConnectionO;
 import com.Score.utils.compat.BuildCompat;
 
 public class ServiceConnectionDelegate extends IServiceConnection.Stub {
@@ -49,67 +48,126 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
         return delegate;
     }
 
+    // ============================================================
+    // ANDROID 14+ (API 34+): 4-parameter method - OVERRIDE THIS!
+    // ============================================================
     @Override
-    public void connected(ComponentName name, IBinder service) throws RemoteException {
-        connectedInternal(name, service, false);
-    }
-
-    public void connected(ComponentName name, IBinder service, boolean dead) throws RemoteException {
-        connectedInternal(name, service, dead);
-    }
-
-    private void connectedInternal(ComponentName name, IBinder service, boolean dead) {
+    public void connected(ComponentName name, IBinder service, android.app.IBinderSession session, boolean dead) throws RemoteException {
+        if (mConn == null) return;
         try {
-            if (mConn == null) return;
-
-            int sdkInt = Build.VERSION.SDK_INT;
-            
-            // ============================================================
-            // ANDROID 14+ (API 34-37+): Use reflection for 4-parameter method
-            // ============================================================
-            if (sdkInt >= 34) {
-                try {
-                    Class<?> binderSessionClass = Class.forName("android.app.IBinderSession");
-                    Method method = mConn.getClass().getMethod("connected", 
-                        ComponentName.class, IBinder.class, binderSessionClass, boolean.class);
-                    method.invoke(mConn, mComponentName, service, null, dead);
-                    return;
-                } catch (Throwable t) {
-                    // Fall through
-                }
+            // Try to call the 4-parameter method on the original connection
+            try {
+                Method method = mConn.getClass().getDeclaredMethod("connected",
+                    ComponentName.class, IBinder.class, android.app.IBinderSession.class, boolean.class);
+                method.setAccessible(true);
+                method.invoke(mConn, mComponentName, service, session, dead);
+                return;
+            } catch (NoSuchMethodException e) {
+                // Fall through to 3-parameter
             }
 
-            // ============================================================
-            // ANDROID 9-13 (API 28-33): Use 3-parameter method
-            // ============================================================
+            // Fallback: Call 3-parameter method if 4-parameter not available
             try {
-                Method method = mConn.getClass().getMethod("connected", 
+                Method method = mConn.getClass().getDeclaredMethod("connected",
                     ComponentName.class, IBinder.class, boolean.class);
+                method.setAccessible(true);
                 method.invoke(mConn, mComponentName, service, dead);
+            } catch (NoSuchMethodException e2) {
+                // Fallback: Call 2-parameter method
+                try {
+                    Method method = mConn.getClass().getDeclaredMethod("connected",
+                        ComponentName.class, IBinder.class);
+                    method.setAccessible(true);
+                    method.invoke(mConn, mComponentName, service);
+                } catch (NoSuchMethodException e3) {
+                    mConn.connected(mComponentName, service);
+                }
+            }
+        } catch (Throwable e) {
+            android.util.Log.e("ServiceConnectionDelegate", "Error in connected (4-param)", e);
+            throw new RemoteException(e.getMessage());
+        }
+    }
+
+    // ============================================================
+    // ANDROID 9-13 (API 28-33): 3-parameter method
+    // ============================================================
+    @Override
+    public void connected(ComponentName name, IBinder service, boolean dead) throws RemoteException {
+        if (mConn == null) return;
+        try {
+            // Try 4-parameter first (Android 14+ original connection)
+            try {
+                Method method = mConn.getClass().getDeclaredMethod("connected",
+                    ComponentName.class, IBinder.class, android.app.IBinderSession.class, boolean.class);
+                method.setAccessible(true);
+                method.invoke(mConn, mComponentName, service, null, dead);
+                return;
+            } catch (NoSuchMethodException e) {
+                // Fall through to 3-parameter
+            }
+
+            // Try 3-parameter method
+            try {
+                Method method = mConn.getClass().getDeclaredMethod("connected",
+                    ComponentName.class, IBinder.class, boolean.class);
+                method.setAccessible(true);
+                method.invoke(mConn, mComponentName, service, dead);
+            } catch (NoSuchMethodException e2) {
+                // Fallback to 2-parameter
+                try {
+                    Method method = mConn.getClass().getDeclaredMethod("connected",
+                        ComponentName.class, IBinder.class);
+                    method.setAccessible(true);
+                    method.invoke(mConn, mComponentName, service);
+                } catch (NoSuchMethodException e3) {
+                    mConn.connected(mComponentName, service);
+                }
+            }
+        } catch (Throwable e) {
+            android.util.Log.e("ServiceConnectionDelegate", "Error in connected (3-param)", e);
+            throw new RemoteException(e.getMessage());
+        }
+    }
+
+    // ============================================================
+    // LEGACY: 2-parameter method
+    // ============================================================
+    @Override
+    public void connected(ComponentName name, IBinder service) throws RemoteException {
+        if (mConn == null) return;
+        try {
+            // Try the most complete method first
+            try {
+                Method method = mConn.getClass().getDeclaredMethod("connected",
+                    ComponentName.class, IBinder.class, android.app.IBinderSession.class, boolean.class);
+                method.setAccessible(true);
+                method.invoke(mConn, mComponentName, service, null, false);
                 return;
             } catch (NoSuchMethodException e) {
                 // Fall through
-            } catch (Throwable t) {
-                // Fall through
             }
 
-            // ============================================================
-            // ULTIMATE FALLBACK: 2-parameter method
-            // ============================================================
+            // Try 3-parameter
             try {
-                Method method = mConn.getClass().getMethod("connected", 
-                    ComponentName.class, IBinder.class);
-                method.invoke(mConn, mComponentName, service);
-            } catch (Throwable t) {
+                Method method = mConn.getClass().getDeclaredMethod("connected",
+                    ComponentName.class, IBinder.class, boolean.class);
+                method.setAccessible(true);
+                method.invoke(mConn, mComponentName, service, false);
+            } catch (NoSuchMethodException e2) {
+                // Fallback to 2-parameter
                 try {
+                    Method method = mConn.getClass().getDeclaredMethod("connected",
+                        ComponentName.class, IBinder.class);
+                    method.setAccessible(true);
+                    method.invoke(mConn, mComponentName, service);
+                } catch (NoSuchMethodException e3) {
                     mConn.connected(mComponentName, service);
-                } catch (Throwable ignored) {
-                    // Ignore
                 }
             }
-
         } catch (Throwable e) {
-            android.util.Log.e("ServiceConnectionDelegate", "Error in connectedInternal", e);
+            android.util.Log.e("ServiceConnectionDelegate", "Error in connected (2-param)", e);
+            throw new RemoteException(e.getMessage());
         }
     }
 }
