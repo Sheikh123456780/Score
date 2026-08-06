@@ -17,6 +17,7 @@ public:
     static void HookJniFun(JNIEnv *env, const char *class_name, const char *method_name, const char *sign, void * new_fun, void ** orig_fun,
                            bool is_static);
     static void HookJniFun(JNIEnv *env, jobject java_method, void *new_fun, void **orig_fun, bool is_static);
+    static bool isInitialized() { return HookEnv.is_initialized; }
 };
 
 #endif //VIRTUAL_APP_JNIHOOK_H
