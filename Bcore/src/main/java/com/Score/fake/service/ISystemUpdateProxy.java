@@ -2,33 +2,63 @@ package com.Score.fake.service;
 
 import android.os.Build;
 import android.os.IBinder;
-import android.os.IInterface;
 
 import black.android.os.BRServiceManager;
 import com.Score.fake.hook.BinderInvocationStub;
 
 import java.lang.reflect.Method;
 
+/**
+ * Updated for Android 9 (API 28) to Android 17 (API 37) Compatibility
+ */
 public class ISystemUpdateProxy extends BinderInvocationStub {
 
     public ISystemUpdateProxy() {
-        super(BRServiceManager.get().getService("system_update"));
+        super(getServiceBinder());
+    }
+
+    private static IBinder getServiceBinder() {
+        try {
+            return BRServiceManager.get().getService("system_update");
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override
     protected Object getWho() {
-        IBinder binder = BRServiceManager.get().getService("system_update");
+        IBinder binder = getServiceBinder();
         if (binder == null) {
             return null;
         }
 
         try {
-            // Dynamic resolution based on API version targeting system update stubs
-            Class<?> stubClass = Class.forName("android.os.ISystemUpdateManager$Stub");
-            Method asInterfaceMethod = stubClass.getMethod("asInterface", IBinder.class);
-            return asInterfaceMethod.invoke(null, binder);
+            // Try multiple possible class names for different Android versions
+            String[] classNames = {
+                "android.os.ISystemUpdateManager$Stub",
+                "android.os.IUpdateEngine$Stub",
+                "android.os.ISystemUpdateService$Stub"
+            };
+
+            for (String className : classNames) {
+                try {
+                    Class<?> stubClass = Class.forName(className);
+                    Method asInterfaceMethod = stubClass.getMethod("asInterface", IBinder.class);
+                    Object result = asInterfaceMethod.invoke(null, binder);
+                    if (result != null) {
+                        return result;
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Try next class name
+                } catch (Throwable t) {
+                    // Try next class name
+                }
+            }
+
+            // Fallback: Return binder itself as a proxy
+            return binder;
+
         } catch (Throwable t) {
-            // Fallback generic proxy for non-standard OEM implementations
             return binder;
         }
     }
@@ -36,7 +66,11 @@ public class ISystemUpdateProxy extends BinderInvocationStub {
     @Override
     protected void inject(Object baseInvocation, Object proxyInvocation) {
         if (getWho() != null) {
-            replaceSystemService("system_update");
+            try {
+                replaceSystemService("system_update");
+            } catch (Throwable t) {
+                // Silent fail
+            }
         }
     }
 
