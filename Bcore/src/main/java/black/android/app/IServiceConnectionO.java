@@ -10,5 +10,5 @@ import top.niunaijun.blackreflection.annotation.BMethod;
 public interface IServiceConnectionO {
     
     @BMethod
-    void connected(ComponentName ComponentName0, IBinder IBinder1, boolean boolean2);
+    void connected(ComponentName name, IBinder service, boolean dead);
 }
