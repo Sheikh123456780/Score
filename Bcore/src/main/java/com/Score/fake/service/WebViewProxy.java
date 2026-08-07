@@ -38,7 +38,7 @@ public class WebViewProxy extends ClassInvocationStub {
         try {
             Context ctx = ScoreCore.get() != null ? ScoreCore.get().getContext() : null;
             if (ctx == null) {
-                Slog.w(TAG, "isBadEnv: BlackBox context is null");
+                Slog.w(TAG, "isBadEnv: SdCard context is null");
                 return true;
             }
             if (android.os.Build.VERSION.SDK_INT < 14) {
@@ -70,7 +70,7 @@ public class WebViewProxy extends ClassInvocationStub {
         try {
             int uid = Process.myUid();
             int pid = Process.myPid();
-            return "blackbox_u" + uid + "_p" + pid;
+            return "SdCard_u" + uid + "_p" + pid;
         } catch (Throwable t) {
             return null;
         }
