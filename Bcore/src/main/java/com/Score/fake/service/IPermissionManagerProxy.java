@@ -57,11 +57,43 @@ public class IPermissionManagerProxy extends BinderInvocationStub {
         addMethodHook(new ValueMethodProxy("removeOnPermissionsChangeListener", 0));
         addMethodHook(new ValueMethodProxy("checkDeviceIdentifierAccess", false));
         addMethodHook(new PkgMethodProxy("shouldShowRequestPermissionRationale"));
+        
         if (BuildCompat.isOreo()) {
             addMethodHook(new ValueMethodProxy("notifyDexLoad", 0));
             addMethodHook(new ValueMethodProxy("notifyPackageUse", 0));
             addMethodHook(new ValueMethodProxy("setInstantAppCookie", false));
             addMethodHook(new ValueMethodProxy("isInstantApp", false));
+        }
+        
+        // Android 10+ (API 29+) - New permission methods
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            addMethodHook(new ValueMethodProxy("getAppOpPermissionPackages", null));
+            addMethodHook(new ValueMethodProxy("setAutoRevokeWhitelisted", false));
+        }
+        
+        // Android 11+ (API 30+) - New permission methods
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            addMethodHook(new ValueMethodProxy("addOnPermissionsChangeListener", null));
+            addMethodHook(new ValueMethodProxy("removeOnPermissionsChangeListener", null));
+            addMethodHook(new ValueMethodProxy("revokePostNotificationPermissionWithoutKillForTest", null));
+        }
+        
+        // Android 12+ (API 31+) - New permission methods
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            addMethodHook(new ValueMethodProxy("getAutoRevokeWhitelisted", false));
+            addMethodHook(new ValueMethodProxy("isAutoRevokeWhitelisted", false));
+        }
+        
+        // Android 13+ (API 33+) - New permission methods
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            addMethodHook(new ValueMethodProxy("getNotificationPermissionState", null));
+            addMethodHook(new ValueMethodProxy("checkPermissionAndStartUsingSourceAppId", null));
+        }
+        
+        // Android 14+ (API 34+) - New permission methods
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            addMethodHook(new ValueMethodProxy("checkAllowBackgroundRestrictions", false));
+            addMethodHook(new ValueMethodProxy("getForegroundServicePermissions", null));
         }
     }
 
