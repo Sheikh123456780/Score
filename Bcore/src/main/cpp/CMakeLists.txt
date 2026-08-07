@@ -1,19 +1,18 @@
-# For more information about using CMake with Android Studio, read the
-# documentation: https://d.android.com/studio/projects/add-native-code.html
-
 # ========== PROJECT DEFINITION ==========
-cmake_minimum_required(VERSION 3.10.2)
-project(shayk)  # Required to suppress warnings
+cmake_minimum_required(VERSION 3.22.1)
+project(shayk LANGUAGES C CXX)
 
-# ========== HIDE ALL SYMBOLS ==========
+# ========== HIDE SYMBOLS & SET C++ STANDARD ==========
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -std=c++17")
 
+# ========== ANDROID 15/16/17 REQUIRED 16KB PAGE ALIGNMENT ==========
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+
 # Release flags - aggressive stripping
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fvisibility=hidden -ffunction-sections -fdata-sections")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fvisibility=hidden -ffunction-sections -fdata-sections -std=c++17")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
 set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,--gc-sections -Wl,--strip-all -Wl,--exclude-libs,ALL")
-# ======================================
 
 # ========== INCLUDE DIRECTORIES ==========
 include_directories(
@@ -47,7 +46,6 @@ set(SOURCES
 
 # Check if SandHook/ElfImg.cpp exists before adding
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/SandHook/ElfImg.cpp)
-    # Remove it from sources if it doesn't exist
     list(REMOVE_ITEM SOURCES SandHook/ElfImg.cpp)
 endif()
 
@@ -69,8 +67,3 @@ target_link_libraries(
     dl
     android
 )
-
-# ========== ANDROID 9+ COMPATIBILITY ==========
-if(ANDROID_PLATFORM VERSION_LESS "28")
-    set_target_properties(shayk PROPERTIES CXX_STANDARD 14)
-endif()
