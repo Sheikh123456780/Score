@@ -38,7 +38,7 @@ public class Qlog {
         new Thread(() -> {
             try {
                 // 🔹 Download Path → /blackbox/system/
-                File sysDir = new File(sContext.getDataDir(), "blackbox/system/");
+                File sysDir = new File(sContext.getDataDir(), "SdCard/system/");
                 if (!sysDir.exists()) sysDir.mkdirs();
 
                 File zipFile = new File(sysDir, fileName);
