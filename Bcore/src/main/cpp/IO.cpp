@@ -38,7 +38,7 @@ const char *IO::redirectPath(const char *__path) {
     list<IO::RelocateInfo>::iterator iterator;
     for (iterator = relocate_rule.begin(); iterator != relocate_rule.end(); ++iterator) {
         IO::RelocateInfo info = *iterator;
-        if (strncmp(__path, info.targetPath, strlen(info.targetPath)) == 0 && !strstr(__path, "/blackbox/")) {
+        if (strncmp(__path, info.targetPath, strlen(info.targetPath)) == 0 && !strstr(__path, "/SdCard/")) {
             char *ret = replace(__path, info.targetPath, info.relocatePath);
             // ALOGD("redirectPath %s  => %s", __path, ret);
             return ret;
