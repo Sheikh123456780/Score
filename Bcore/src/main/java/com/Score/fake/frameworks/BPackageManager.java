@@ -197,9 +197,9 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         return Collections.emptyList();
     }
 
-    public List<ResolveInfo> queryIntentServices(Intent intent, int flags, String resolvedType, int userId) {
+            public List<ResolveInfo> queryIntentServices(Intent intent, int flags, String resolvedType, int userId) {
         try {
-            List<ResolveInfo> result = getService().queryIntentServices(intent, flags, userId);
+            List<ResolveInfo> result = getService().queryIntentServices(intent, flags, resolvedType, userId);
 
             return result != null ? result : Collections.emptyList();
         } catch (RemoteException e) {
@@ -207,6 +207,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         }
         return Collections.emptyList();
     }
+
 
     public List<ResolveInfo> queryBroadcastReceivers(Intent intent, int flags, String resolvedType, int userId) {
         try {
