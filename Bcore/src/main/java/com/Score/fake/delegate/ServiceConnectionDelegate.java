@@ -51,7 +51,7 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
     // ============================================================
     // ANDROID 14+ (API 34+): 4-parameter method - OVERRIDE THIS!
     // ============================================================
-    @Override
+  //  @Override
     public void connected(ComponentName name, IBinder service, android.app.IBinderSession session, boolean dead) throws RemoteException {
         if (mConn == null) return;
         try {
@@ -92,7 +92,7 @@ public class ServiceConnectionDelegate extends IServiceConnection.Stub {
     // ============================================================
     // ANDROID 9-13 (API 28-33): 3-parameter method
     // ============================================================
-    @Override
+//    @Override
     public void connected(ComponentName name, IBinder service, boolean dead) throws RemoteException {
         if (mConn == null) return;
         try {
