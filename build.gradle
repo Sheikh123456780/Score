@@ -36,12 +36,12 @@ task clean(type: Delete) {
 ext {
     kotlin_version = '1.7.10'
     ktx_version = '1.9.0'
-    minSdk = 21
-    compileSdkVersion = 34
-    compileSdk = 34
+    minSdk = 28
+    compileSdkVersion = 35
+    compileSdk = 35
     buildToolsVersion = "34"
-    targetSdkVersion = 28
-    targetSdk = 28
+    targetSdkVersion = 35
+    targetSdk = 35
 
     ndkVersion = '29.0.14033849'
     cmakeVersion = '3.22.1'
