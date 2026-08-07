@@ -234,12 +234,16 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
         }
     }
 
-    @Override
+        @Override
     public List<ResolveInfo> queryIntentServices(
-            Intent intent, int flags, int userId) {
-        final String resolvedType = intent.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver());
+            Intent intent, int flags, String resolvedType, int userId) {
+        if (!sUserManager.exists(userId)) return Collections.emptyList();
+        if (resolvedType == null) {
+            resolvedType = intent.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver());
+        }
         return this.queryIntentServicesInternal(intent, resolvedType, flags, userId);
     }
+
 
     private ActivityInfo getActivity(ComponentName component, int flags,
                                      int userId) {
