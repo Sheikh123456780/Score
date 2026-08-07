@@ -14,7 +14,6 @@
 #include <Hook/DexFileHook.h>
 #include <Hook/RuntimeHook.h>
 #include "Utils/HexDump.h"
-#include "Utils/PointerCheck.h" // Used to safely validate pointers in sig_callback
 #include "hidden_api.h"
 
 #include <cstring>
@@ -120,7 +119,6 @@ void init(JNIEnv *env, jobject clazz, jint api_level) {
     ALOGD("NativeCore init on API level: %d", api_level);
     VMEnv.api_level = api_level;
     
-    // Safely initialize JniHook once
     try {
         JniHook::InitJniHook(env, api_level);
     } catch (...) {
@@ -142,7 +140,6 @@ void init(JNIEnv *env, jobject clazz, jint api_level) {
     VMEnv.initialized = true;
 }
 
-// Fixed JNI String Memory Leak
 void addIORule(JNIEnv *env, jclass clazz, jstring target_path, jstring relocate_path) {
     ALOGD("set addIORule");
     if (target_path == nullptr || relocate_path == nullptr) return;
@@ -229,7 +226,7 @@ uint64_t OriSyscall(uint64_t num, uint64_t SYSARG_1, uint64_t SYSARG_2, uint64_t
         "mov %0, x0\n\t"
         : "=r"(x0)
         : "r"(num), "r"(SYSARG_1), "r"(SYSARG_2), "r"(SYSARG_3), "r"(SYSARG_4), "r"(SYSARG_5), "r"(SYSARG_6)
-        : "x8", "x0", "x1", "x2", "x3", "x4", "x5" // Fixed duplicate "x4"
+        : "x8", "x0", "x1", "x2", "x3", "x4", "x5"
     );
     return x0;
 }
@@ -253,6 +250,17 @@ uint32_t OriSyscall(uint32_t num, uint32_t SYSARG_1, uint32_t SYSARG_2, uint32_t
     return x0;
 }
 #endif
+
+// Signal-safe pointer readability check using raw syscall
+static bool safeIsReadablePtr(const void *ptr) {
+    if (ptr == nullptr) return false;
+#if defined(__aarch64__) || defined(__arm__)
+    long res = (long) OriSyscall(__NR_write, (uint64_t)-1, (uint64_t)ptr, 1, 0, 0, 0);
+    return res != -14;
+#else
+    return true;
+#endif
+}
 
 void sig_callback(int signo, siginfo_t *info, void *data) {
     unsigned long syscall_number;
@@ -280,8 +288,7 @@ void sig_callback(int signo, siginfo_t *info, void *data) {
         int flags = (int) SYSARG_3;
         int mode = (int) SYSARG_4;
 
-        // Safely check pointer before logging to avoid SIGSEGV inside signal handler
-        if (pathname != nullptr && PointerCheck::isValidReadPtr(pathname)) {
+        if (pathname != nullptr && safeIsReadablePtr(pathname)) {
             ALOGE("Openat trapped: %s", pathname);
         }
 
@@ -396,3 +403,4 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     
     return JNI_VERSION_1_6;
 }
+
