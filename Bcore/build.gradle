@@ -11,8 +11,8 @@ android {
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 28
+        minSdkVersion 28
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
         consumerProguardFiles 'consumer-rules.pro'
