@@ -16,7 +16,7 @@ import org.lsposed.lsparanoid.Obfuscate;
 public class BEnvironment {
 
     // ========== CHANGED: localhost → SdCard ==========
-    private static final File sVirtualRoot = new File(ScoreCore.getContext().getCacheDir().getParent(), "SdCard");
+    private static final File sVirtualRoot = new File(ScoreCore.getContext().getFilesDir(), "virtual");
     
     private static final File sExternalVirtualRoot;
     
@@ -35,9 +35,14 @@ public class BEnvironment {
     public static void load() {
         FileUtils.mkdirs(sVirtualRoot);
         FileUtils.mkdirs(sExternalVirtualRoot);
+
         FileUtils.mkdirs(getSystemDir());
         FileUtils.mkdirs(getCacheDir());
         FileUtils.mkdirs(getProcDir());
+
+        FileUtils.mkdirs(new File(sExternalVirtualRoot, "Android"));
+        FileUtils.mkdirs(new File(sExternalVirtualRoot, "Android/data"));
+        FileUtils.mkdirs(new File(sExternalVirtualRoot, "Android/obb"));
     }
 
     public static File getObbDir(String packageName) {
