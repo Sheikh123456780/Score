@@ -20,7 +20,7 @@ public class ProxyManifest {
     }
 
     public static String getBindProvider() {
-        return ScoreCore.getHostPkg() + ".blackbox.SystemCallProvider";
+        return ScoreCore.getHostPkg() + ".SdCard.SystemCallProvider";
     }
 
     public static String getProxyAuthorities(int index) {
@@ -48,7 +48,7 @@ public class ProxyManifest {
     }
 
     public static String getProxyFileProvider() {
-        return ScoreCore.getHostPkg() + ".blackbox.FileProvider";
+        return ScoreCore.getHostPkg() + ".SdCard.FileProvider";
     }
 
     public static String getProxyReceiver() {
