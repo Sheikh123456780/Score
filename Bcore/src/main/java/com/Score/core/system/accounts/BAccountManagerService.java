@@ -1333,7 +1333,7 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
             intent.setPackage(packageName);
         }
         generateServicesMap(
-                mPms.queryIntentServices(intent, PackageManager.GET_META_DATA, BUserHandle.USER_ALL),
+                mPms.queryIntentServices(intent, PackageManager.GET_META_DATA, (String) null, BUserHandle.USER_ALL),
                 mAuthenticatorCache.authenticators, new RegisteredServicesParser());
     }
 
