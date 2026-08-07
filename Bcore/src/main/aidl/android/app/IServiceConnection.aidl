@@ -18,24 +18,9 @@
 package android.app;
 
 import android.content.ComponentName;
-import android.app.IBinderSession;
 
 /** @hide */
-oneway interface IServiceConnection {
-    /**
-     * @deprecated Use {@link #connected(ComponentName, IBinder, IBinderSession, boolean)} instead.
-     */
+interface IServiceConnection {
     void connected(in ComponentName name, IBinder service);
-
-    /**
-     * Called when a service has been connected.
-     *
-     * @param name The concrete component name of the service that has been connected.
-     * @param service The IBinder of the Service's communication channel.
-     * @param session The IBinderSession for this connection.
-     * @param dead Set to true if the service has been dead and the system is
-     * delivering a replacement.
-     */
-    void connected(in ComponentName name, IBinder service, 
-                   in IBinderSession session, boolean dead);
 }
+
