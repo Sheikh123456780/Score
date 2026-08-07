@@ -103,8 +103,9 @@ public class BEnvironment {
         return new File(getAppDir(packageName), "package.conf");
     }
 
+    // FIXED: Returns sExternalVirtualRoot directly instead of appending userId
     public static File getExternalUserDir(int userId) {
-        return new File(sExternalVirtualRoot, String.format(Locale.US, "%d", userId));
+        return sExternalVirtualRoot;
     }
 
     public static File getUserDir(int userId) {
