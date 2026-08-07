@@ -4,18 +4,21 @@ plugins {
 }
 
 android {
+    compileSdk = 35
+    buildToolsVersion = '34.0.0'
+    namespace "com.Score"
+    ndkVersion '29.0.14033849'
 
-    compileSdkVersion = 35
-    buildToolsVersion = '34'
     aidlPackagedList "android/app/IServiceConnection.aidl"
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 28
+        minSdk = 21
+        targetSdk = 28
         versionCode 1
         versionName "1.0"
         consumerProguardFiles 'consumer-rules.pro'
+        
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -25,17 +28,13 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            
-            packagingOptions {
-                jniLibs {
-                    keepDebugSymbols = []
-                    useLegacyPackaging = true
-                }
-            }
         }
-        
-        debug {
-            minifyEnabled false
+    }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols = []
+            useLegacyPackaging = true
         }
     }
     
@@ -50,37 +49,19 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
     
-    aaptOptions {
-        cruncherEnabled = false
-        useNewCruncher = false
-    }
-    
     buildFeatures {
         aidl true
     }
     
-    testOptions {
-        unitTests.returnDefaultValues = true
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+        warningsAsErrors = false
+        disable += ["UnusedResources", "RestrictedApi"]
+        textOutput = file("stdout")
+        textReport = false
+        check += ["NewApi", "InlinedApi"]
     }
-    
-    lintOptions {
-        checkReleaseBuilds false
-        abortOnError false
-        warningsAsErrors false
-        disable "UnusedResources", 'RestrictedApi'
-        textOutput "stdout"
-        textReport false
-        check 'NewApi', 'InlinedApi'
-    }
-    
-    namespace "com.Score"
-    ndkVersion '29.0.14033849'
-}
-
-tasks.withType(Javadoc) {
-    options.addStringOption('Xdoclint:none', '-quiet')
-    options.addStringOption('encoding', 'UTF-8')
-    options.addStringOption('charSet', 'UTF-8')
 }
 
 dependencies {
