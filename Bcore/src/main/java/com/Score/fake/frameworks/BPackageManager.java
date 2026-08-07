@@ -199,7 +199,8 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
 
     public List<ResolveInfo> queryIntentServices(Intent intent, int flags, String resolvedType, int userId) {
         try {
-            List<ResolveInfo> result = getService().queryIntentServices(intent, flags, resolvedType, userId);
+            List<ResolveInfo> result = getService().queryIntentServices(intent, flags, userId);
+
             return result != null ? result : Collections.emptyList();
         } catch (RemoteException e) {
             crash(e);
