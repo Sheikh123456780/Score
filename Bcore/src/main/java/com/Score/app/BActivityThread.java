@@ -29,7 +29,6 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.WebView;
 
-import java.io.File;
 import java.lang.reflect.Method;
 import java.security.Security;
 import java.util.ArrayList;
@@ -49,7 +48,6 @@ import black.android.app.BRActivityThreadQ;
 import black.android.app.BRContextImpl;
 import black.android.app.BRLoadedApk;
 import black.android.app.BRService;
-import black.android.app.LoadedApk;
 import black.android.content.BRBroadcastReceiver;
 import black.android.content.BRContentProviderClient;
 import black.android.graphics.BRCompatibility;
@@ -68,12 +66,10 @@ import com.Score.core.env.VirtualRuntime;
 import com.Score.core.system.user.BUserHandle;
 import com.Score.entity.AppConfig;
 import com.Score.entity.am.ReceiverData;
-import com.Score.entity.pm.InstalledModule;
 import com.Score.fake.delegate.AppInstrumentation;
 import com.Score.fake.delegate.ContentProviderDelegate;
-import com.Score.fake.frameworks.BXposedManager;
-import com.Score.fake.hook.HookManager;
 import com.Score.fake.service.HCallbackProxy;
+import com.Score.fake.hook.HookManager;
 import com.Score.utils.Reflector;
 import com.Score.utils.Slog;
 import com.Score.utils.compat.ActivityManagerCompat;
@@ -81,14 +77,6 @@ import com.Score.utils.compat.BuildCompat;
 import com.Score.utils.compat.ContextCompat;
 import com.Score.utils.compat.StrictModeCompat;
 
-/**
- * Created by Milk on 3/31/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * 此处无Bug
- */
 public class BActivityThread extends IBActivityThread.Stub {
     public static final String TAG = "BActivityThread";
 
@@ -176,7 +164,6 @@ public class BActivityThread extends IBActivityThread.Stub {
     public void initProcess(AppConfig appConfig) {
         synchronized (mConfigLock) {
             if (this.mAppConfig != null && !this.mAppConfig.packageName.equals(appConfig.packageName)) {
-                // 该进程已被attach
                 throw new RuntimeException("reject init process: " + appConfig.processName + ", this process is : " + this.mAppConfig.processName);
             }
             this.mAppConfig = appConfig;
@@ -195,7 +182,7 @@ public class BActivityThread extends IBActivityThread.Stub {
                     }
                 }, 0);
             } catch (RemoteException e) {
-                e.printStackTrace();
+                Slog.e(TAG, "linkToDeath failed", e);
             }
         }
     }
@@ -211,22 +198,23 @@ public class BActivityThread extends IBActivityThread.Stub {
         ClassLoader classLoader = BRLoadedApk.get(mBoundApplication.info).getClassLoader();
         Service service;
         try {
-            service = (Service) classLoader.loadClass(serviceInfo.name).newInstance();
+            service = (Service) classLoader.loadClass(serviceInfo.name).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
-            e.printStackTrace();
-            Slog.e(TAG, "Unable to instantiate service " + serviceInfo.name + ": " + e.toString());
+            Slog.e(TAG, "Unable to instantiate service " + serviceInfo.name, e);
             return null;
         }
 
         try {
-            Context context = ScoreCore.getContext().createPackageContext(serviceInfo.packageName,Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            Context context = ScoreCore.getContext().createPackageContext(serviceInfo.packageName, Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            if (context == null) return null;
+            
             BRContextImpl.get(context).setOuterContext(service);
-            BRService.get(service).attach(context,ScoreCore.mainThread(),serviceInfo.name,token,mInitialApplication,BRActivityManagerNative.get().getDefault());
+            BRService.get(service).attach(context, ScoreCore.mainThread(), serviceInfo.name, token, mInitialApplication, BRActivityManagerNative.get().getDefault());
             ContextCompat.fix(context);
             service.onCreate();
             return service;
         } catch (Exception e) {
-            throw new RuntimeException("Unable to create service " + serviceInfo.name + ": " + e.toString(), e);
+            throw new RuntimeException("Unable to create service " + serviceInfo.name, e);
         }
     }
 
@@ -237,23 +225,24 @@ public class BActivityThread extends IBActivityThread.Stub {
         ClassLoader classLoader = BRLoadedApk.get(mBoundApplication.info).getClassLoader();
         JobService service;
         try {
-            service = (JobService) classLoader.loadClass(serviceInfo.name).newInstance();
+            service = (JobService) classLoader.loadClass(serviceInfo.name).getDeclaredConstructor().newInstance();
         } catch (Exception e) {
-            e.printStackTrace();
-            Slog.e(TAG, "Unable to create JobService " + serviceInfo.name + ": " + e.toString());
+            Slog.e(TAG, "Unable to create JobService " + serviceInfo.name, e);
             return null;
         }
 
         try {
-            Context context = ScoreCore.getContext().createPackageContext(serviceInfo.packageName,Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            Context context = ScoreCore.getContext().createPackageContext(serviceInfo.packageName, Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            if (context == null) return null;
+
             BRContextImpl.get(context).setOuterContext(service);
-            BRService.get(service).attach(context,ScoreCore.mainThread(),serviceInfo.name,BActivityThread.currentActivityThread().getActivityThread(),mInitialApplication,BRActivityManagerNative.get().getDefault());
+            BRService.get(service).attach(context, ScoreCore.mainThread(), serviceInfo.name, BActivityThread.currentActivityThread().getActivityThread(), mInitialApplication, BRActivityManagerNative.get().getDefault());
             ContextCompat.fix(context);
             service.onCreate();
             service.onBind(null);
             return service;
         } catch (Exception e) {
-            throw new RuntimeException("Unable to create JobService " + serviceInfo.name + ": " + e.toString(), e);
+            throw new RuntimeException("Unable to create JobService " + serviceInfo.name, e);
         }
     }
 
@@ -279,18 +268,24 @@ public class BActivityThread extends IBActivityThread.Stub {
         }
 
         PackageInfo packageInfo = ScoreCore.getBPackageManager().getPackageInfo(packageName, PackageManager.GET_PROVIDERS, BActivityThread.getUserId());
-        ApplicationInfo applicationInfo = packageInfo.applicationInfo;
+        ApplicationInfo applicationInfo = packageInfo != null ? packageInfo.applicationInfo : null;
+        if (applicationInfo == null) {
+            throw new RuntimeException("Failed to fetch ApplicationInfo for " + packageName);
+        }
+
         if (packageInfo.providers == null) {
             packageInfo.providers = new ProviderInfo[]{};
         }
         mProviders.addAll(Arrays.asList(packageInfo.providers));
 
         Object boundApplication = BRActivityThread.get(ScoreCore.mainThread()).mBoundApplication();
-
         Context packageContext = createPackageContext(applicationInfo);
+        if (packageContext == null) {
+            throw new RuntimeException("Failed to create package context for " + packageName);
+        }
+
         Object loadedApk = BRContextImpl.get(packageContext).mPackageInfo();
         BRLoadedApk.get(loadedApk)._set_mSecurityViolation(false);
-        // fix applicationInfo
         BRLoadedApk.get(loadedApk)._set_mApplicationInfo(applicationInfo);
 
         int targetSdkVersion = applicationInfo.targetSdkVersion;
@@ -298,13 +293,15 @@ public class BActivityThread extends IBActivityThread.Stub {
             StrictMode.ThreadPolicy newPolicy = new StrictMode.ThreadPolicy.Builder(StrictMode.getThreadPolicy()).permitNetwork().build();
             StrictMode.setThreadPolicy(newPolicy);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            if (targetSdkVersion < Build.VERSION_CODES.N) {
-                StrictModeCompat.disableDeathOnFileUriExposure();
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && targetSdkVersion < Build.VERSION_CODES.N) {
+            StrictModeCompat.disableDeathOnFileUriExposure();
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            WebView.setDataDirectorySuffix(getUserId() + ":" + packageName + ":" + processName);
+            try {
+                WebView.setDataDirectorySuffix(getUserId() + ":" + packageName + ":" + processName);
+            } catch (Throwable t) {
+                Slog.e(TAG, "Failed setting WebView data directory suffix", t);
+            }
         }
 
         VirtualRuntime.setupRuntime(processName, applicationInfo);
@@ -315,7 +312,6 @@ public class BActivityThread extends IBActivityThread.Stub {
         }
 
         NativeCore.init(Build.VERSION.SDK_INT);
-        assert packageContext != null;
         IOCore.get().enableRedirect(packageContext);
 
         AppBindData bindData = new AppBindData();
@@ -333,26 +329,19 @@ public class BActivityThread extends IBActivityThread.Stub {
 
         mBoundApplication = bindData;
 
-        //ssl适配
         if (BRNetworkSecurityConfigProvider.getRealClass() != null) {
             Security.removeProvider("AndroidNSSP");
             BRNetworkSecurityConfigProvider.get().install(packageContext);
         }
+
         Application application;
         try {
             onBeforeCreateApplication(packageName, processName, packageContext);
             application = BRLoadedApk.get(loadedApk).makeApplication(false, null);
-            if(application == null){
-                Log.e(TAG,"makeApplication application Error!" );
-                throw new NullPointerException("application空指针异常");
+            if (application == null) {
+                throw new NullPointerException("makeApplication returned null");
             }
             mInitialApplication = application;
-            try {
-    // Preload WebView to avoid "No WebView installed" crash
-    new WebView(mInitialApplication).destroy();
-} catch (Throwable t) {
-    t.printStackTrace();
-}
 
             BRActivityThread.get(ScoreCore.mainThread())._set_mInitialApplication(mInitialApplication);
             ContextCompat.fix((Context) BRActivityThread.get(ScoreCore.mainThread()).getSystemContext());
@@ -365,26 +354,27 @@ public class BActivityThread extends IBActivityThread.Stub {
             NativeCore.init_seccomp();
             HookManager.get().checkEnv(HCallbackProxy.class);
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Unable to makeApplication", e);
+            throw new RuntimeException("Unable to makeApplication for " + packageName, e);
         }
     }
 
     public static Context createPackageContext(ApplicationInfo info) {
         try {
-            return ScoreCore.getContext().createPackageContext(info.packageName,Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+            return ScoreCore.getContext().createPackageContext(info.packageName, Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
         } catch (Exception e) {
-            e.printStackTrace();
+            Slog.e(TAG, "Failed creating package context for " + info.packageName, e);
         }
         return null;
     }
 
-    private void installProviders(Context context, String processName, List<ProviderInfo> provider) {
+    private void installProviders(Context context, String processName, List<ProviderInfo> providers) {
         long origId = Binder.clearCallingIdentity();
         try {
-            for (ProviderInfo providerInfo : provider) {
+            for (ProviderInfo providerInfo : providers) {
                 try {
-                    if (processName.equals(providerInfo.processName) || providerInfo.processName.equals(context.getPackageName()) || providerInfo.multiprocess) {
+                    if (TextUtils.equals(processName, providerInfo.processName) || 
+                        TextUtils.equals(context.getPackageName(), providerInfo.processName) || 
+                        providerInfo.multiprocess) {
                         installProvider(ScoreCore.mainThread(), context, providerInfo, null);
                     }
                 } catch (Throwable ignored) {
@@ -397,7 +387,7 @@ public class BActivityThread extends IBActivityThread.Stub {
     }
 
     public Object getPackageInfo() {
-        return mBoundApplication.info;
+        return mBoundApplication != null ? mBoundApplication.info : null;
     }
 
     public static void installProvider(Object mainThread, Context context, ProviderInfo providerInfo, Object holder) throws Throwable {
@@ -407,36 +397,6 @@ public class BActivityThread extends IBActivityThread.Stub {
             installProvider.invoke(mainThread, context, holder, providerInfo, false, true, true);
         }
     }
-
-/*    public void loadXposed(Context context) {
-        String vPackageName = getAppPackageName();
-        String vProcessName = getAppProcessName();
-        if (!TextUtils.isEmpty(vPackageName) && !TextUtils.isEmpty(vProcessName) && BXposedManager.get().isXPEnable()) {
-            assert vPackageName != null;
-            assert vProcessName != null;
-
-            boolean isFirstApplication = vPackageName.equals(vProcessName);
-
-            List<InstalledModule> installedModules = BXposedManager.get().getInstalledModules();
-            for (InstalledModule installedModule : installedModules) {
-                if (!installedModule.enable) {
-                    continue;
-                }
-                try {
-                    PineXposed.loadModule(new File(installedModule.getApplication().sourceDir));
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
-            }
-            try {
-                PineXposed.onPackageLoad(vPackageName, vProcessName, context.getApplicationInfo(), isFirstApplication, context.getClassLoader());
-            } catch (Throwable ignored) {
-            }
-        }
-        if (ScoreCore.get().isHideXposed()) {
-            NativeCore.hideXposed();
-        }
-    }*/
 
     @Override
     public IBinder getActivityThread() {
@@ -465,12 +425,16 @@ public class BActivityThread extends IBActivityThread.Stub {
         if (!isInit()) {
             bindApplication(BActivityThread.getAppConfig().packageName, BActivityThread.getAppConfig().processName);
         }
+        if (providerInfo == null || providerInfo.authority == null) return null;
+
         String[] split = providerInfo.authority.split(";");
         for (String auth : split) {
             ContentProviderClient contentProviderClient = ScoreCore.getContext().getContentResolver().acquireContentProviderClient(auth);
+            if (contentProviderClient == null) continue;
+
             IInterface iInterface = BRContentProviderClient.get(contentProviderClient).mContentProvider();
-            if (iInterface == null)
-                continue;
+            if (iInterface == null) continue;
+
             return iInterface.asBinder();
         }
         return null;
@@ -485,12 +449,13 @@ public class BActivityThread extends IBActivityThread.Stub {
     public void finishActivity(final IBinder token) {
         mH.post(() -> {
             Map<IBinder, Object> activities = BRActivityThread.get(ScoreCore.mainThread()).mActivities();
-            if (activities.isEmpty())
-                return;
+            if (activities == null || activities.isEmpty()) return;
+
             Object clientRecord = activities.get(token);
-            if (clientRecord == null)
-                return;
+            if (clientRecord == null) return;
+
             Activity activity = getActivityByToken(token);
+            if (activity == null) return;
 
             while (activity.getParent() != null) {
                 activity = activity.getParent();
@@ -513,10 +478,10 @@ public class BActivityThread extends IBActivityThread.Stub {
                 newIntent = intent;
             }
             Object mainThread = ScoreCore.mainThread();
-            if (BRActivityThread.get(ScoreCore.mainThread())._check_performNewIntents(null, null) != null) {
-                BRActivityThread.get(mainThread).performNewIntents(token,Collections.singletonList(newIntent));
+            if (BRActivityThread.get(mainThread)._check_performNewIntents(null, null) != null) {
+                BRActivityThread.get(mainThread).performNewIntents(token, Collections.singletonList(newIntent));
             } else if (BRActivityThreadNMR1.get(mainThread)._check_performNewIntents(null, null, false) != null) {
-                BRActivityThreadNMR1.get(mainThread).performNewIntents(token,Collections.singletonList(newIntent),true);
+                BRActivityThreadNMR1.get(mainThread).performNewIntents(token, Collections.singletonList(newIntent), true);
             } else if (BRActivityThreadQ.get(mainThread)._check_handleNewIntent(null, null) != null) {
                 BRActivityThreadQ.get(mainThread).handleNewIntent(token, Collections.singletonList(newIntent));
             }
@@ -539,41 +504,53 @@ public class BActivityThread extends IBActivityThread.Stub {
                 ClassLoader classLoader = baseContext.getClassLoader();
                 intent.setExtrasClassLoader(classLoader);
 
-                mReceiver = (BroadcastReceiver) classLoader.loadClass(activityInfo.name).newInstance();
+                mReceiver = (BroadcastReceiver) classLoader.loadClass(activityInfo.name).getDeclaredConstructor().newInstance();
                 BRBroadcastReceiver.get(mReceiver).setPendingResult(pendingResult);
                 mReceiver.onReceive(baseContext, intent);
+                
                 BroadcastReceiver.PendingResult finish = BRBroadcastReceiver.get(mReceiver).getPendingResult();
                 if (finish != null) {
                     finish.finish();
                 }
-                ScoreCore.getBActivityManager().finishBroadcast(data.data);
             } catch (Throwable throwable) {
-                throwable.printStackTrace();
-                Slog.e(TAG,"Error receiving broadcast " + intent + " in " + mReceiver);
+                Slog.e(TAG, "Error receiving broadcast " + intent + " in receiver " + activityInfo.name, throwable);
+            } finally {
+                // Guaranteed finish to prevent broadcast queue timeouts
+                try {
+                    ScoreCore.getBActivityManager().finishBroadcast(data.data);
+                } catch (Throwable t) {
+                    Slog.e(TAG, "Failed finishing broadcast", t);
+                }
             }
         });
     }
 
     public static Activity getActivityByToken(IBinder token) {
+        if (token == null) return null;
         Map<IBinder, Object> iBinderObjectMap = BRActivityThread.get(ScoreCore.mainThread()).mActivities();
-        return BRActivityThreadActivityClientRecord.get(iBinderObjectMap.get(token)).activity();
+        if (iBinderObjectMap == null) return null;
+
+        Object record = iBinderObjectMap.get(token);
+        if (record == null) return null;
+
+        return BRActivityThreadActivityClientRecord.get(record).activity();
     }
 
     private void onBeforeCreateApplication(String packageName, String processName, Context context) {
-        for (AppLifecycleCallback appLifecycleCallback : ScoreCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.beforeCreateApplication(packageName, processName, context, BActivityThread.getUserId());
+        for (AppLifecycleCallback callback : ScoreCore.get().getAppLifecycleCallbacks()) {
+            callback.beforeCreateApplication(packageName, processName, context, BActivityThread.getUserId());
         }
     }
 
     private void onBeforeApplicationOnCreate(String packageName, String processName, Application application) {
-        for (AppLifecycleCallback appLifecycleCallback : ScoreCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.beforeApplicationOnCreate(packageName, processName, application, BActivityThread.getUserId());
+        for (AppLifecycleCallback callback : ScoreCore.get().getAppLifecycleCallbacks()) {
+            callback.beforeApplicationOnCreate(packageName, processName, application, BActivityThread.getUserId());
         }
     }
 
     private void onAfterApplicationOnCreate(String packageName, String processName, Application application) {
-        for (AppLifecycleCallback appLifecycleCallback : ScoreCore.get().getAppLifecycleCallbacks()) {
-            appLifecycleCallback.afterApplicationOnCreate(packageName, processName, application, BActivityThread.getUserId());
+        for (AppLifecycleCallback callback : ScoreCore.get().getAppLifecycleCallbacks()) {
+            callback.afterApplicationOnCreate(packageName, processName, application, BActivityThread.getUserId());
         }
     }
 
@@ -584,3 +561,4 @@ public class BActivityThread extends IBActivityThread.Stub {
         Object info;
     }
 }
+
