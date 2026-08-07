@@ -58,6 +58,15 @@ public class IOCore {
       return path;
     }
 
+    // Protect internal system paths from being redirected
+    if (path.startsWith("/data/")
+        || path.startsWith("/apex/")
+        || path.startsWith("/proc/")
+        || path.startsWith("/sys/")
+        || path.startsWith("/dev/")) {
+      return path;
+    }
+
     // Search the key from TrieTree
     String key = mTrieTree.search(path);
     if (!TextUtils.isEmpty(key)) {
@@ -114,32 +123,13 @@ public class IOCore {
       if (ScoreCore.getContext().getExternalCacheDir() != null
           && context.getExternalCacheDir() != null) {
         File external = BEnvironment.getExternalUserDir(BActivityThread.getUserId());
-        // sdcard
-        File sdcardAndroidFile = new File("/sdcard/Android");
         String androidDir = String.format("/storage/emulated/%d/Android", systemUserId);
-        if (!sdcardAndroidFile.exists()) {
-          sdcardAndroidFile = new File(androidDir);
-        }
-        if (sdcardAndroidFile.exists()) {
-          File[] childDirs = sdcardAndroidFile.listFiles(pathname -> pathname.isDirectory());
-          if (childDirs != null) {
-            for (File childDir : childDirs) {
-              Log.d(TAG, childDir.getAbsolutePath());
-              rule.put(
-                  "/sdcard/Android/" + childDir.getName(),
-                  external.getAbsolutePath() + "/Android/" + childDir.getName());
-              rule.put(
-                  androidDir + "/" + childDir.getName(),
-                  external.getAbsolutePath() + "/Android/" + childDir.getName());
-            }
-          } else {
-            rule.put("/sdcard/Android", external.getAbsolutePath() + "/Android");
-            rule.put(androidDir, external.getAbsolutePath() + "/Android");
-          }
-        } else {
-          rule.put("/sdcard/Android", external.getAbsolutePath());
-          rule.put(androidDir, external.getAbsolutePath());
-        }
+        
+        // Redirect only the directories that matter - don't enumerate all subdirectories
+        rule.put("/sdcard/Android/data", external.getAbsolutePath() + "/Android/data");
+        rule.put("/sdcard/Android/obb", external.getAbsolutePath() + "/Android/obb");
+        rule.put(androidDir + "/data", external.getAbsolutePath() + "/Android/data");
+        rule.put(androidDir + "/obb", external.getAbsolutePath() + "/Android/obb");
       }
       if (ScoreCore.get().isHideRoot()) {
         hideRoot(rule);
