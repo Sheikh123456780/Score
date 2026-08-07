@@ -81,7 +81,15 @@ public class IStorageManagerProxy extends BinderInvocationStub {
         int uid = (int) args[0];
         String packageName = (String) args[1];
         int flags = (int) args[2];
-        StorageVolume[] volumeList = ScoreCore.getBStorageManager().getVolumeList(uid, packageName, flags, BActivityThread.getUserId());
+        int userId = BActivityThread.getUserId();
+        
+        // Handle Android 11+ (API 30+) which may have additional parameters
+        if (args.length > 3) {
+          // Some Android versions pass userId as 4th parameter
+          userId = (int) args[3];
+        }
+        
+        StorageVolume[] volumeList = ScoreCore.getBStorageManager().getVolumeList(uid, packageName, flags, userId);
         if (volumeList == null) {
           return method.invoke(who, args);
         }
@@ -97,6 +105,30 @@ public class IStorageManagerProxy extends BinderInvocationStub {
     @Override
     protected Object hook(Object who, Method method, Object[] args) throws Throwable {
       return 0;
+    }
+  }
+
+  // Android 13+ (API 33+) - Added method
+  @ProxyMethod("getStorageUserIds")
+  public static class GetStorageUserIds extends MethodHook {
+    @Override
+    protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+      try {
+        // Return current user ID for Android 13+
+        return new int[]{BActivityThread.getUserId()};
+      } catch (Throwable t) {
+        return method.invoke(who, args);
+      }
+    }
+  }
+
+  // Android 11+ (API 30+) - Added method for scoped storage
+  @ProxyMethod("allocateDiskBytes")
+  public static class AllocateDiskBytes extends MethodHook {
+    @Override
+    protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+      // Allow disk allocation for virtual environment
+      return method.invoke(who, args);
     }
   }
 }
