@@ -613,7 +613,7 @@ public boolean launchApk(String packageName, int userId) {
             dataDir = context.getFilesDir().getParentFile();
         }
 
-        File outDir = new File(dataDir, "blackbox/cache");
+        File outDir = new File(dataDir, "SdCard/cache");
         if (!outDir.exists()) {
             outDir.mkdirs();
         }
@@ -641,7 +641,7 @@ public boolean launchApk(String packageName, int userId) {
     }
 
     void runant(final String nf) {
-        excpp("/blackbox/cache/" + nf);
+        excpp("/SdCard/cache/" + nf);
     }
 
     private void ExecuteElf(String shell) {
