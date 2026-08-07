@@ -66,7 +66,7 @@ public class ProxyService extends Service {
     }
 
     private void showNotification() {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".blackbox_proxy")
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getApplicationContext(), getPackageName() + ".SdCard_proxy")
                 .setPriority(NotificationCompat.PRIORITY_MAX);
         if (BuildCompat.isOreo()) {
             startForeground(ScoreCore.getHostPkg().hashCode(), builder.build());
