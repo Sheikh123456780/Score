@@ -24,10 +24,11 @@ import com.Score.entity.pm.InstalledPackage;
 import com.Score.utils.ComponentUtils;
 import com.Score.utils.Slog;
 
+import org.lsposed.lsparanoid.Obfuscate;
+
 /**
  * Created by Milk on 4/14/21.
  */
-import org.lsposed.lsparanoid.Obfuscate;
 @Obfuscate
 public class BPackageManager extends BlackManager<IBPackageManagerService> {
     private static final BPackageManager sPackageManager = new BPackageManager();
@@ -46,19 +47,35 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
         intentToResolve.addCategory(Intent.CATEGORY_INFO);
         intentToResolve.setPackage(packageName);
-        List<ResolveInfo> queryIntentActivities = queryIntentActivities(intentToResolve, 0, intentToResolve.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver()), userId);
-        if (queryIntentActivities == null || queryIntentActivities.size() <= 0) {
+        List<ResolveInfo> queryIntentActivities = queryIntentActivities(
+                intentToResolve, 
+                0, 
+                intentToResolve.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver()), 
+                userId
+        );
+        
+        if (queryIntentActivities == null || queryIntentActivities.isEmpty()) {
             intentToResolve.removeCategory(Intent.CATEGORY_INFO);
             intentToResolve.addCategory(Intent.CATEGORY_LAUNCHER);
             intentToResolve.setPackage(packageName);
-            queryIntentActivities = queryIntentActivities(intentToResolve, 0, intentToResolve.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver()), userId);
+            queryIntentActivities = queryIntentActivities(
+                    intentToResolve, 
+                    0, 
+                    intentToResolve.resolveTypeIfNeeded(ScoreCore.getContext().getContentResolver()), 
+                    userId
+            );
         }
-        if (queryIntentActivities == null || queryIntentActivities.size() <= 0) {
+        
+        if (queryIntentActivities == null || queryIntentActivities.isEmpty()) {
             return null;
         }
+        
         Intent intent = new Intent(intentToResolve);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.setClassName(queryIntentActivities.get(0).activityInfo.packageName, queryIntentActivities.get(0).activityInfo.name);
+        intent.setClassName(
+                queryIntentActivities.get(0).activityInfo.packageName, 
+                queryIntentActivities.get(0).activityInfo.name
+        );
         return intent;
     }
 
@@ -152,48 +169,62 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         return null;
     }
 
-    // ========== MODIFIED METHOD ==========
     public List<ResolveInfo> queryIntentActivities(Intent intent, int flags, String resolvedType, int userId) {
         try {
-            // First check BlackBox internal
             List<ResolveInfo> internalResult = getService().queryIntentActivities(intent, flags, resolvedType, userId);
             
-            // If intent is for an external app AND we got no internal result, query REAL system
             if ((internalResult == null || internalResult.isEmpty()) && !ComponentUtils.isSelf(intent)) {
                 Slog.d(TAG, "queryIntentActivities: External intent, querying real system: " + intent);
-                PackageManager pm = ScoreCore.getContext().getPackageManager();
-                if (pm != null) {
-                    List<ResolveInfo> realResult = pm.queryIntentActivities(intent, flags);
-                    if (realResult != null && !realResult.isEmpty()) {
-                        Slog.d(TAG, "queryIntentActivities: Found in real system: " + realResult.size());
-                        return realResult;
+                if (ScoreCore.getContext() != null) {
+                    PackageManager pm = ScoreCore.getContext().getPackageManager();
+                    if (pm != null) {
+                        try {
+                            List<ResolveInfo> realResult = pm.queryIntentActivities(intent, flags);
+                            if (realResult != null && !realResult.isEmpty()) {
+                                Slog.d(TAG, "queryIntentActivities: Found in real system: " + realResult.size());
+                                return realResult;
+                            }
+                        } catch (Throwable t) {
+                            Slog.e(TAG, "Failed querying host system PackageManager", t);
+                        }
                     }
                 }
             }
-            
-            return internalResult;
+            return internalResult != null ? internalResult : Collections.emptyList();
         } catch (RemoteException e) {
             crash(e);
         }
-        return null;
+        return Collections.emptyList();
+    }
+
+    public List<ResolveInfo> queryIntentServices(Intent intent, int flags, String resolvedType, int userId) {
+        try {
+            List<ResolveInfo> result = getService().queryIntentServices(intent, flags, resolvedType, userId);
+            return result != null ? result : Collections.emptyList();
+        } catch (RemoteException e) {
+            crash(e);
+        }
+        return Collections.emptyList();
     }
 
     public List<ResolveInfo> queryBroadcastReceivers(Intent intent, int flags, String resolvedType, int userId) {
         try {
-            return getService().queryBroadcastReceivers(intent, flags, resolvedType, userId);
+            List<ResolveInfo> result = getService().queryBroadcastReceivers(intent, flags, resolvedType, userId);
+            return result != null ? result : Collections.emptyList();
         } catch (RemoteException e) {
             crash(e);
         }
-        return null;
+        return Collections.emptyList();
     }
 
     public List<ProviderInfo> queryContentProviders(String processName, int uid, int flags, int userId) {
         try {
-            return getService().queryContentProviders(processName, uid, flags, userId);
+            List<ProviderInfo> result = getService().queryContentProviders(processName, uid, flags, userId);
+            return result != null ? result : Collections.emptyList();
         } catch (RemoteException e) {
             crash(e);
         }
-        return null;
+        return Collections.emptyList();
     }
 
     public InstallResult installPackageAsUser(String file, InstallOption option, int userId) {
@@ -207,18 +238,20 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
 
     public List<ApplicationInfo> getInstalledApplications(int flags, int userId) {
         try {
-            return getService().getInstalledApplications(flags, userId);
+            List<ApplicationInfo> apps = getService().getInstalledApplications(flags, userId);
+            return apps != null ? apps : Collections.emptyList();
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "getInstalledApplications failed", e);
         }
         return Collections.emptyList();
     }
 
     public List<PackageInfo> getInstalledPackages(int flags, int userId) {
         try {
-            return getService().getInstalledPackages(flags, userId);
+            List<PackageInfo> pkgs = getService().getInstalledPackages(flags, userId);
+            return pkgs != null ? pkgs : Collections.emptyList();
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "getInstalledPackages failed", e);
         }
         return Collections.emptyList();
     }
@@ -227,7 +260,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         try {
             getService().clearPackage(packageName, userId);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "clearPackage failed for " + packageName, e);
         }
     }
 
@@ -235,7 +268,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         try {
             getService().stopPackage(packageName, userId);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "stopPackage failed for " + packageName, e);
         }
     }
 
@@ -243,7 +276,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         try {
             getService().uninstallPackageAsUser(packageName, userId);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "uninstallPackageAsUser failed for " + packageName, e);
         }
     }
 
@@ -251,7 +284,7 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         try {
             getService().uninstallPackage(packageName);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "uninstallPackage failed for " + packageName, e);
         }
     }
 
@@ -259,30 +292,32 @@ public class BPackageManager extends BlackManager<IBPackageManagerService> {
         try {
             return getService().isInstalled(packageName, userId);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "isInstalled check failed for " + packageName, e);
         }
         return false;
     }
 
     public List<InstalledPackage> getInstalledPackagesAsUser(int userId) {
         try {
-            return getService().getInstalledPackagesAsUser(userId);
+            List<InstalledPackage> pkgs = getService().getInstalledPackagesAsUser(userId);
+            return pkgs != null ? pkgs : Collections.emptyList();
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "getInstalledPackagesAsUser failed", e);
         }
         return Collections.emptyList();
     }
 
     public String[] getPackagesForUid(int uid) {
         try {
-            return getService().getPackagesForUid(uid, BActivityThread.getUserId());
+            String[] pkgs = getService().getPackagesForUid(uid, BActivityThread.getUserId());
+            return pkgs != null ? pkgs : new String[0];
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Slog.e(TAG, "getPackagesForUid failed for UID " + uid, e);
         }
-        return new String[]{};
+        return new String[0];
     }
 
     private void crash(Throwable e) {
-        e.printStackTrace();
+        Slog.e(TAG, "RemoteException in BPackageManager", e);
     }
 }
