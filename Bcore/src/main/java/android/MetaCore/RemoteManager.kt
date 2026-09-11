@@ -38,18 +38,20 @@ import java.util.concurrent.Executors
 class RemoteManager private constructor() : IRemoteManager.Stub() {
 
     companion object {
-    
-         @JvmField
-         val JUNIT_JAR = File(BEnvironment.getCacheDir(), "junit.apk")
-         
-         @JvmField
-         val EMPTY_JAR = File(BEnvironment.getCacheDir(), "empty.apk")
-        
+
+        @JvmField
+        val JUNIT_JAR = File(BEnvironment.getCacheDir(), "junit.apk")
+
+        @JvmField
+        val EMPTY_JAR = File(BEnvironment.getCacheDir(), "empty.apk")
+
         private const val TAG = "MetaActivationManager"
         private const val CT = 45000
         private const val RT = 60000
         private const val MAX_RETRIES = 3
-        private val exe: ExecutorService = Executors.newSingleThreadExecutor()
+
+        private val exe: ExecutorService =
+            Executors.newSingleThreadExecutor()
 
         @Volatile
         private var instance: RemoteManager? = null
@@ -69,20 +71,29 @@ class RemoteManager private constructor() : IRemoteManager.Stub() {
         @JvmStatic
         fun getInstance(): RemoteManager {
             return instance ?: synchronized(this) {
-                instance ?: RemoteManager().also { instance = it }
+                instance ?: RemoteManager().also {
+                    instance = it
+                }
             }
         }
     }
 
     private fun iv(u: String?): Boolean {
-        return u != null && u.startsWith("https://") && !u.contains(" ") && !u.contains("\"")
+        return u != null &&
+                u.startsWith("https://") &&
+                !u.contains(" ") &&
+                !u.contains("\"")
     }
 
     override fun activateSdk(userkey: String?) {
         // ✅ NO LICENSE CHECK - Always activated
         val ctx = BlackBoxCore.getContext() ?: return
-        val sp = ctx.getSharedPreferences(nk.PREFERENCE_NAME, Context.MODE_PRIVATE)
-        
+
+        val sp = ctx.getSharedPreferences(
+            nk.PREFERENCE_NAME,
+            Context.MODE_PRIVATE
+        )
+
         // Save activated state with no expiry
         sp.edit().apply {
             putBoolean("activated", true)
@@ -92,14 +103,20 @@ class RemoteManager private constructor() : IRemoteManager.Stub() {
             putInt("toggle_feature2", 1)
             apply()
         }
-        
+
         nk.setHidden("online")
         nk.Msg = "✅ SDK Activated Successfully (No License Check)"
-        nk.sEnableDaemonService = true
-        nk.sHideRoot = true
-        nk.sHideXposed = true
-        
-        showNotificationSafe("✅ SDK ACTIVATED", "License check disabled - Full access granted")
+
+        // These properties belong to RemoteManager.
+        // They must NOT be accessed through nk.
+        sEnableDaemonService = true
+        sHideRoot = true
+        sHideXposed = true
+
+        showNotificationSafe(
+            "✅ SDK ACTIVATED",
+            "License check disabled - Full access granted"
+        )
     }
 
     override fun getActivatedSdk(): Boolean {
@@ -112,7 +129,12 @@ class RemoteManager private constructor() : IRemoteManager.Stub() {
     override fun getServerMessage(): String {
         return try {
             val msg = nk.getServerMessage()
-            if (msg.isNullOrEmpty()) "No server message" else msg
+
+            if (msg.isNullOrEmpty()) {
+                "No server message"
+            } else {
+                msg
+            }
         } catch (e: Exception) {
             "Error: Failed to get server message"
         }
@@ -127,17 +149,27 @@ class RemoteManager private constructor() : IRemoteManager.Stub() {
     private fun deviceId(): String {
         return try {
             val ctx = BlackBoxCore.getContext()
-            android.provider.Settings.Secure.getString(ctx.contentResolver,android.provider.Settings.Secure.ANDROID_ID) ?: "unknown"
+
+            android.provider.Settings.Secure.getString(
+                ctx.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ) ?: "unknown"
+
         } catch (e: Exception) {
             "unknown"
         }
     }
 
-    private fun getAppName(ctx: Context, pkg: String): String {
+    private fun getAppName(
+        ctx: Context,
+        pkg: String
+    ): String {
         return try {
             val pm = ctx.packageManager
             val info = pm.getApplicationInfo(pkg, 0)
+
             pm.getApplicationLabel(info).toString()
+
         } catch (e: Exception) {
             pkg
         }
@@ -164,76 +196,191 @@ class RemoteManager private constructor() : IRemoteManager.Stub() {
     }
 
     // ---------------- Notification Helpers ----------------
-    private fun showNotificationSafe(title: String, message: String) {
+
+    private fun showNotificationSafe(
+        title: String,
+        message: String
+    ) {
         try {
             val ctx = BlackBoxCore.getContext()
-            showNotification(ctx, title, message)
-        } catch (_: Throwable) { }
+            showNotification(
+                ctx,
+                title,
+                message
+            )
+        } catch (_: Throwable) {
+        }
     }
 
     private val CHANNEL_ID = "meta_sdk_updates"
     private val CHANNEL_NAME = "Meta SDK Updates"
 
-    private fun showNotification(ctx: Context, title: String, msg: String) {
-        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    private fun showNotification(
+        ctx: Context,
+        title: String,
+        msg: String
+    ) {
+        val nm =
+            ctx.getSystemService(
+                Context.NOTIFICATION_SERVICE
+            ) as NotificationManager
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val ch = NotificationChannel(CHANNEL_ID,CHANNEL_NAME,NotificationManager.IMPORTANCE_HIGH)
-            ch.description = "SDK ACTIVATE OR UPDATE NOTIFICATIONS"
+
+            val ch = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            )
+
+            ch.description =
+                "SDK ACTIVATE OR UPDATE NOTIFICATIONS"
+
             ch.enableLights(true)
             ch.lightColor = Color.BLUE
             ch.enableVibration(true)
+
             nm.createNotificationChannel(ch)
         }
-        val nb = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_more)
+
+        val nb = NotificationCompat.Builder(
+            ctx,
+            CHANNEL_ID
+        )
+            .setSmallIcon(
+                android.R.drawable.stat_notify_more
+            )
             .setContentTitle(title)
             .setContentText(msg)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(
+                NotificationCompat.PRIORITY_HIGH
+            )
             .setAutoCancel(true)
-        nm.notify((System.currentTimeMillis() and 0x7fffffff).toInt(), nb.build())
+
+        nm.notify(
+            (System.currentTimeMillis() and 0x7fffffff).toInt(),
+            nb.build()
+        )
     }
 
     // ================= NOTIFICATIONS =================
-    private fun showServerNotification(title:String,msg:String,type:String){
-        val ctx=BlackBoxCore.getContext()
-        val nm=ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val ch="meta_server"
-        if(Build.VERSION.SDK_INT>=26) nm.createNotificationChannel(NotificationChannel(ch,"SERVER",NotificationManager.IMPORTANCE_HIGH))
 
-        val t=type.lowercase()
-        val icon=when{
-            t.contains("warn")||t.contains("alert")->android.R.drawable.stat_sys_warning
-            t.contains("event")->android.R.drawable.star_big_on
-            t.contains("update")->android.R.drawable.stat_sys_download_done
-            else->android.R.drawable.ic_dialog_info
+    private fun showServerNotification(
+        title: String,
+        msg: String,
+        type: String
+    ) {
+        val ctx = BlackBoxCore.getContext()
+
+        val nm =
+            ctx.getSystemService(
+                Context.NOTIFICATION_SERVICE
+            ) as NotificationManager
+
+        val ch = "meta_server"
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    ch,
+                    "SERVER",
+                    NotificationManager.IMPORTANCE_HIGH
+                )
+            )
         }
-        nm.notify(System.currentTimeMillis().toInt(),NotificationCompat.Builder(ctx,ch)
-            .setSmallIcon(icon)
-            .setContentTitle(title)
-            .setContentText(msg)
-            .setColor(Color.CYAN)
-            .setAutoCancel(true)
-            .build())
+
+        val t = type.lowercase()
+
+        val icon = when {
+            t.contains("warn") ||
+                    t.contains("alert") ->
+                android.R.drawable.stat_sys_warning
+
+            t.contains("event") ->
+                android.R.drawable.star_big_on
+
+            t.contains("update") ->
+                android.R.drawable.stat_sys_download_done
+
+            else ->
+                android.R.drawable.ic_dialog_info
+        }
+
+        nm.notify(
+            System.currentTimeMillis().toInt(),
+            NotificationCompat.Builder(ctx, ch)
+                .setSmallIcon(icon)
+                .setContentTitle(title)
+                .setContentText(msg)
+                .setColor(Color.CYAN)
+                .setAutoCancel(true)
+                .build()
+        )
     }
 
-    private fun showImageNotification(title:String,msg:String,img:String,base:String){
-        exe.execute{
-            try{
-                if(img.isEmpty()) return@execute
-                val url= if(base.isNotEmpty()) "$base/$img" else img
-                val bmp=BitmapFactory.decodeStream(URL(url).openStream())
-                val ctx=BlackBoxCore.getContext()
-                val nm=ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                val ch="meta_img"
-                if(Build.VERSION.SDK_INT>=26) nm.createNotificationChannel(NotificationChannel(ch,"IMG",NotificationManager.IMPORTANCE_HIGH))
-                nm.notify(System.currentTimeMillis().toInt(),NotificationCompat.Builder(ctx,ch)
-                    .setSmallIcon(android.R.drawable.sym_def_app_icon)
-                    .setContentTitle(title)
-                    .setContentText(msg)
-                    .setStyle(NotificationCompat.BigPictureStyle().bigPicture(bmp))
-                    .setAutoCancel(true)
-                    .build())
-            }catch(_:Exception){}
+    private fun showImageNotification(
+        title: String,
+        msg: String,
+        img: String,
+        base: String
+    ) {
+        exe.execute {
+            try {
+
+                if (img.isEmpty()) {
+                    return@execute
+                }
+
+                val url =
+                    if (base.isNotEmpty()) {
+                        "$base/$img"
+                    } else {
+                        img
+                    }
+
+                val bmp =
+                    BitmapFactory.decodeStream(
+                        URL(url).openStream()
+                    )
+
+                val ctx =
+                    BlackBoxCore.getContext()
+
+                val nm =
+                    ctx.getSystemService(
+                        Context.NOTIFICATION_SERVICE
+                    ) as NotificationManager
+
+                val ch = "meta_img"
+
+                if (Build.VERSION.SDK_INT >= 26) {
+                    nm.createNotificationChannel(
+                        NotificationChannel(
+                            ch,
+                            "IMG",
+                            NotificationManager.IMPORTANCE_HIGH
+                        )
+                    )
+                }
+
+                nm.notify(
+                    System.currentTimeMillis().toInt(),
+                    NotificationCompat.Builder(ctx, ch)
+                        .setSmallIcon(
+                            android.R.drawable.sym_def_app_icon
+                        )
+                        .setContentTitle(title)
+                        .setContentText(msg)
+                        .setStyle(
+                            NotificationCompat.BigPictureStyle()
+                                .bigPicture(bmp)
+                        )
+                        .setAutoCancel(true)
+                        .build()
+                )
+
+            } catch (_: Exception) {
+            }
         }
     }
 }
