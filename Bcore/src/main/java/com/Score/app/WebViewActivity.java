@@ -28,6 +28,9 @@ import com.Score.utils.Slog;
  * incoming VIEW/redirect intents without leaving the virtualized app.
  */
 public class WebViewActivity extends Activity {
+    // Chromium reports net::ERR_CACHE_MISS to WebView as error code -1.
+    // WebViewClient does not expose this constant on all Android SDK stubs.
+    private static final int ERROR_CACHE_MISS = -1;
     public static final String TAG = "WebViewActivity";
 
     public static final String EXTRA_URL = "url";
@@ -307,7 +310,7 @@ public class WebViewActivity extends Activity {
                 // frame once with LOAD_NO_CACHE instead of leaving the user
                 // on Chromium's generic "Page not available" screen.
                 if (request.isForMainFrame()
-                        && error.getErrorCode() == WebViewClient.ERROR_CACHE_MISS
+                        && error.getErrorCode() == ERROR_CACHE_MISS
                         && !cacheMissRetried) {
                     cacheMissRetried = true;
                     String retryUrl = request.getUrl().toString();
@@ -327,7 +330,7 @@ public class WebViewActivity extends Activity {
             // immediately commits its generic error page. Other errors keep
             // the normal WebView behavior.
             if (error == null
-                    || error.getErrorCode() != WebViewClient.ERROR_CACHE_MISS
+                    || error.getErrorCode() != ERROR_CACHE_MISS
                     || request == null
                     || !request.isForMainFrame()
                     || !cacheMissRetried) {
@@ -342,7 +345,7 @@ public class WebViewActivity extends Activity {
             Slog.e(TAG, "onReceivedError (legacy): " + failingUrl
                     + " code=" + errorCode + " desc=" + description);
 
-            if (errorCode == WebViewClient.ERROR_CACHE_MISS && !cacheMissRetried
+            if (errorCode == ERROR_CACHE_MISS && !cacheMissRetried
                     && !TextUtils.isEmpty(failingUrl)) {
                 cacheMissRetried = true;
                 view.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
@@ -362,3 +365,4 @@ public class WebViewActivity extends Activity {
         }
     }
 }
+
