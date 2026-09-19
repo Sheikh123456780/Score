@@ -39,6 +39,7 @@ public class WebViewActivity extends Activity {
     private WebView webView;
     private boolean enableRedirect = true;
     private boolean followRedirects = true;
+    private boolean cacheMissRetried = false;
 
     public static class LoginWebChromeClient extends WebChromeClient {
         private LoginWebChromeClient() {
@@ -96,7 +97,11 @@ public class WebViewActivity extends Activity {
         settings.setSupportMultipleWindows(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // Login forms/OAuth redirects can arrive as POST navigations. On some
+        // Samsung WebView builds a stale WebView cache produces ERR_CACHE_MISS.
+        // Start with a network-first cache policy so the login page is not
+        // dependent on a cached POST response.
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         if (android.os.Build.VERSION.SDK_INT >= 21) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
@@ -239,6 +244,7 @@ public class WebViewActivity extends Activity {
 
             CookieManager cookies = CookieManager.getInstance();
             cookies.flush();
+            cacheMissRetried = false;
 
             super.onPageFinished(view, url);
         }
@@ -295,8 +301,38 @@ public class WebViewActivity extends Activity {
                 Slog.e(TAG, "onReceivedError: " + request.getUrl()
                         + " code=" + error.getErrorCode()
                         + " desc=" + error.getDescription());
+
+                // ERROR_CACHE_MISS is especially common when an OAuth/login
+                // form is resumed after a POST navigation. Retry the main
+                // frame once with LOAD_NO_CACHE instead of leaving the user
+                // on Chromium's generic "Page not available" screen.
+                if (request.isForMainFrame()
+                        && error.getErrorCode() == WebViewClient.ERROR_CACHE_MISS
+                        && !cacheMissRetried) {
+                    cacheMissRetried = true;
+                    String retryUrl = request.getUrl().toString();
+                    view.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+                    view.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (webView != null && !TextUtils.isEmpty(retryUrl)) {
+                                Slog.w(TAG, "Retrying after ERR_CACHE_MISS: " + retryUrl);
+                                webView.loadUrl(retryUrl);
+                            }
+                        }
+                    }, 150L);
+                }
             }
-            super.onReceivedError(view, request, error);
+            // Do not call super for a cache-miss retry; Chromium otherwise
+            // immediately commits its generic error page. Other errors keep
+            // the normal WebView behavior.
+            if (error == null
+                    || error.getErrorCode() != WebViewClient.ERROR_CACHE_MISS
+                    || request == null
+                    || !request.isForMainFrame()
+                    || !cacheMissRetried) {
+                super.onReceivedError(view, request, error);
+            }
         }
 
         @Override
@@ -305,6 +341,23 @@ public class WebViewActivity extends Activity {
                                     String description, String failingUrl) {
             Slog.e(TAG, "onReceivedError (legacy): " + failingUrl
                     + " code=" + errorCode + " desc=" + description);
+
+            if (errorCode == WebViewClient.ERROR_CACHE_MISS && !cacheMissRetried
+                    && !TextUtils.isEmpty(failingUrl)) {
+                cacheMissRetried = true;
+                view.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+                view.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (webView != null) {
+                            Slog.w(TAG, "Retrying after legacy ERR_CACHE_MISS: " + failingUrl);
+                            webView.loadUrl(failingUrl);
+                        }
+                    }
+                }, 150L);
+                return;
+            }
+
             super.onReceivedError(view, errorCode, description, failingUrl);
         }
     }
