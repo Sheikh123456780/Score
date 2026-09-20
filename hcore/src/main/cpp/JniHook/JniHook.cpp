@@ -1,5 +1,6 @@
 //
 // updated by alex5402 on 3/8/21.
+// patched for Android 10–17 compatibility (Android 14+ removed Field.getArtField)
 //
 
 #include <jni.h>
@@ -69,11 +70,10 @@ inline static bool ClearAccessFlag(char *art_method, uint32_t flag) {
 
 inline static bool HasAccessFlag(char *art_method, uint32_t flag) {
     uint32_t flags = GetAccessFlags(art_method);
-    ALOGD("AccessFlag:flags = 0x%x,flag = 0x%x",flags,flag);
+    ALOGD("AccessFlag:flags = 0x%x,flag = 0x%x", flags, flag);
     return (flags & flag) == flag;
 }
 
-// Add error handling for method flag checking
 inline static bool IsNativeMethod(char *art_method) {
     try {
         return HasAccessFlag(art_method, kAccNative);
@@ -84,26 +84,67 @@ inline static bool IsNativeMethod(char *art_method) {
 }
 
 inline static bool ClearFastNativeFlag(char *art_method) {
-    // FastNative
     return HookEnv.api_level < __ANDROID_API_P__ && ClearAccessFlag(art_method, kAccFastNative);
 }
 
+// ---------------------------------------------------------------------------
+// GetArtMethod — patched for Android 14+ where Executable.artMethod is gone
+// ---------------------------------------------------------------------------
 static void *GetArtMethod(JNIEnv *env, jclass clazz, jmethodID methodId) {
     if (HookEnv.api_level >= __ANDROID_API_Q__) {
         jclass executable = env->FindClass("java/lang/reflect/Executable");
+        if (!executable) {
+            env->ExceptionClear();
+            ALOGD("GetArtMethod: Executable class missing, using raw jmethodID");
+            return methodId;
+        }
         jfieldID artId = env->GetFieldID(executable, "artMethod", "J");
+        if (!artId) {
+            env->ExceptionClear();
+            ALOGD("GetArtMethod: artMethod field missing (SDK %d), using raw jmethodID",
+                  HookEnv.api_level);
+            return methodId;
+        }
         jobject method = env->ToReflectedMethod(clazz, methodId, true);
-        return reinterpret_cast<void *>(env->GetLongField(method, artId));
+        if (!method) {
+            env->ExceptionClear();
+            return methodId;
+        }
+        jlong art = env->GetLongField(method, artId);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return methodId;
+        }
+        return reinterpret_cast<void *>(art);
     } else {
         return methodId;
     }
 }
 
+// ---------------------------------------------------------------------------
+// GetFieldMethod — patched for Android 14+ where Field.getArtField is gone
+// ---------------------------------------------------------------------------
 static void *GetFieldMethod(JNIEnv *env, jobject field) {
     if (HookEnv.api_level >= __ANDROID_API_Q__) {
         jclass fieldClass = env->FindClass("java/lang/reflect/Field");
+        if (!fieldClass) {
+            env->ExceptionClear();
+            ALOGE("GetFieldMethod: Field class not found");
+            return nullptr;
+        }
         jmethodID getArtField = env->GetMethodID(fieldClass, "getArtField", "()J");
-        return reinterpret_cast<void *>(env->CallLongMethod(field, getArtField));
+        if (!getArtField) {
+            env->ExceptionClear();
+            ALOGD("GetFieldMethod: getArtField missing (SDK %d), fallback to FromReflectedField",
+                  HookEnv.api_level);
+            return env->FromReflectedField(field);
+        }
+        jlong artField = env->CallLongMethod(field, getArtField);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return nullptr;
+        }
+        return reinterpret_cast<void *>(artField);
     } else {
         return env->FromReflectedField(field);
     }
@@ -111,8 +152,10 @@ static void *GetFieldMethod(JNIEnv *env, jobject field) {
 
 bool CheckFlags(void *artMethod) {
     char *method = static_cast<char *>(artMethod);
-    
-    // Add error handling for flag checking
+    if (method == nullptr) {
+        ALOGD("CheckFlags: artMethod is null, skipping");
+        return false;
+    }
     try {
         if (!HasAccessFlag(method, kAccNative)) {
             ALOGD("Method is not native, skipping hook");
@@ -171,7 +214,6 @@ JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name
         ALOGE("jni hook error. class：%s, method：%s", class_name, method_name);
         return;
     }
-    // FastNative
     if (HookEnv.api_level == __ANDROID_API_O__ || HookEnv.api_level == __ANDROID_API_O_MR1__) {
         AddAccessFlag((char *) artMethod, kAccFastNative);
     }
@@ -189,7 +231,12 @@ __attribute__((section (".mytext")))  JNICALL void native_offset2
 __attribute__((section (".mytext")))  JNICALL void set_method_accessible
         (JNIEnv *env, jclass obj, jclass clazz, jobject method) {
     jmethodID methodId = env->FromReflectedMethod(method);
-    char *art_method = static_cast<char *>(GetArtMethod(env, clazz, methodId));
+    void *raw = GetArtMethod(env, clazz, methodId);
+    if (raw == nullptr) {
+        ALOGE("set_method_accessible: GetArtMethod returned null");
+        return;
+    }
+    char *art_method = static_cast<char *>(raw);
     AddAccessFlag(art_method, kAccPublic);
     if (HookEnv.api_level >= __ANDROID_API_Q__) {
         AddAccessFlag(art_method, kAccPublicApi);
@@ -198,7 +245,12 @@ __attribute__((section (".mytext")))  JNICALL void set_method_accessible
 
 __attribute__((section (".mytext")))  JNICALL void set_field_accessible
         (JNIEnv *env, jclass obj, jclass clazz, jobject field) {
-    char *artField = static_cast<char *>(GetFieldMethod(env, field));
+    void *raw = GetFieldMethod(env, field);
+    if (raw == nullptr) {
+        ALOGE("set_field_accessible: GetFieldMethod returned null");
+        return;
+    }
+    char *artField = static_cast<char *>(raw);
     AddAccessFlag(artField, kAccPublic);
     if (HookEnv.api_level >= __ANDROID_API_Q__) {
         AddAccessFlag(artField, kAccPublicApi);
@@ -224,24 +276,41 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     HookEnv.api_level = api_level;
 
     jclass clazz = env->FindClass("top/niunaijun/jnihook/jni/JniHook");
+    if (!clazz) {
+        ALOGE("InitJniHook: JniHook class not found");
+        env->ExceptionClear();
+        return;
+    }
+
     jmethodID nativeOffsetId = env->GetStaticMethodID(clazz, "nativeOffset", "()V");
     jmethodID nativeOffset2Id = env->GetStaticMethodID(clazz, "nativeOffset2", "()V");
 
     jfieldID nativeOffsetFieldId = env->GetStaticFieldID(clazz, "NATIVE_OFFSET", "I");
     jfieldID nativeOffsetField2Id = env->GetStaticFieldID(clazz, "NATIVE_OFFSET_2", "I");
 
-    void *nativeOffsetField = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetFieldId,
-                                                                        true));
-    void *nativeOffsetField2 = GetFieldMethod(env, env->ToReflectedField(clazz, nativeOffsetField2Id,
-                                                                         true));
+    void *nativeOffsetField = GetFieldMethod(env,
+            env->ToReflectedField(clazz, nativeOffsetFieldId, true));
+    void *nativeOffsetField2 = GetFieldMethod(env,
+            env->ToReflectedField(clazz, nativeOffsetField2Id, true));
+
+    if (nativeOffsetField == nullptr || nativeOffsetField2 == nullptr) {
+        ALOGE("InitJniHook: native offset fields null (SDK %d) — aborting hook init",
+              api_level);
+        return;
+    }
     HookEnv.art_field_size = (size_t) nativeOffsetField2 - (size_t) nativeOffsetField;
 
     void *nativeOffset = GetArtMethod(env, clazz, nativeOffsetId);
     void *nativeOffset2 = GetArtMethod(env, clazz, nativeOffset2Id);
+
+    if (nativeOffset == nullptr || nativeOffset2 == nullptr) {
+        ALOGE("InitJniHook: native methods null (SDK %d) — aborting hook init",
+              api_level);
+        return;
+    }
     HookEnv.art_method_size = (size_t) nativeOffset2 - (size_t) nativeOffset;
 
     int i = 0;
-    // calc native offset
     auto artMethod = reinterpret_cast<uintptr_t *>(nativeOffset);
     for (i = 0; i < HookEnv.art_method_size; ++i) {
         if (reinterpret_cast<void *>(artMethod[i]) == native_offset) {
@@ -249,7 +318,7 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
             break;
         }
     }
-    if(i == HookEnv.art_method_size){
+    if (i == HookEnv.art_method_size) {
         ALOGE("init jni hook error. art_method_native_offset not found!");
         return;
     }
@@ -259,23 +328,22 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     flags = flags | kAccStatic;
     flags = flags | kAccNative;
     flags = flags | kAccFinal;
-    if (api_level >= __ANDROID_API_Q__) {//android 10
+    if (api_level >= __ANDROID_API_Q__) {
         flags = flags | kAccPublicApi;
     }
-    if (api_level >= __ANDROID_API_S__) {//android 12
+    if (api_level >= __ANDROID_API_S__) {
         flags = flags | kAccNterpInvokeFastPathFlag;
     }
 
     char *start = reinterpret_cast<char *>(artMethod);
     for (i = 1; i < HookEnv.art_method_size; ++i) {
         auto value = *(uint32_t *) (start + i * sizeof(uint32_t));
-//        ALOGD("art_method_size search:0x%x",value);
         if (value == flags) {
             HookEnv.art_method_flags_offset = i * sizeof(uint32_t);
             break;
         }
     }
-    if(i == HookEnv.art_method_size){
+    if (i == HookEnv.art_method_size) {
         ALOGE("init jni hook error. art_method_flags_offset not found!");
         return;
     }
@@ -295,7 +363,7 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
             break;
         }
     }
-    if(i == HookEnv.art_field_size){
+    if (i == HookEnv.art_field_size) {
         ALOGE("init jni hook error. art_field_flags_offset not found!");
         return;
     }
@@ -309,4 +377,3 @@ void JniHook::InitJniHook(JNIEnv *env, int api_level) {
     HookEnv.get_method_name_id = env->GetStaticMethodID(HookEnv.method_utils_class, "getMethodName",
                                                         "(Ljava/lang/reflect/Method;)Ljava/lang/String;");
 }
-
