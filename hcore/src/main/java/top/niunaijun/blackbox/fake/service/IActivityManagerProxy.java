@@ -61,43 +61,85 @@ import static android.content.Context.RECEIVER_NOT_EXPORTED;
 import static android.content.pm.PackageManager.GET_META_DATA;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
-/**
- * updated by alex5402 on 3/30/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * TFNQw5HgWUS33Ke1eNmSFTwoQySGU7XNsK (USDT TRC20)
- */
+
 @ScanClass(ActivityManagerCommonProxy.class)
 public class IActivityManagerProxy extends ClassInvocationStub {
     public static final String TAG = "ActivityManagerStub";
 
     @Override
     protected Object getWho() {
-        Object iActivityManager = null;
-        if (BuildCompat.isOreo()) {
-            iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
-        } else if (BuildCompat.isL()) {
-            iActivityManager = BRActivityManagerNative.get().gDefault();
+        // 1) Try the normal singleton path
+        try {
+            Object iActivityManager = null;
+            if (BuildCompat.isOreo()) {
+                iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
+            } else if (BuildCompat.isL()) {
+                iActivityManager = BRActivityManagerNative.get().gDefault();
+            }
+            if (iActivityManager != null) {
+                Object instance = BRSingleton.get(iActivityManager).get();
+                if (instance != null) {
+                    Slog.d(TAG, "getWho: returning singleton instance");
+                    return instance;
+                }
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "getWho: singleton path failed: " + t.getMessage());
         }
-        return BRSingleton.get(iActivityManager).get();
+
+        // 2) Fall back to ServiceManager.getService("activity")
+        try {
+            Class<?> sm = Class.forName("android.os.ServiceManager");
+            Method getService = sm.getDeclaredMethod("getService", String.class);
+            getService.setAccessible(true);
+            Object binder = getService.invoke(null, "activity");
+            if (binder instanceof IBinder) {
+                Class<?> stub = Class.forName("android.app.IActivityManager$Stub");
+                Method asInterface = stub.getDeclaredMethod("asInterface", IBinder.class);
+                asInterface.setAccessible(true);
+                Object am = asInterface.invoke(null, binder);
+                if (am != null) {
+                    Slog.d(TAG, "getWho: returning asInterface(ServiceManager binder)");
+                    return am;
+                }
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "getWho: ServiceManager asInterface failed: " + t.getMessage());
+        }
+
+        Slog.e(TAG, "getWho: AM service unavailable, hook will be skipped");
+        return null;
     }
 
     @Override
     protected void inject(Object base, Object proxy) {
-        Object iActivityManager = null;
-        if (BuildCompat.isOreo()) {
-            iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
-        } else if (BuildCompat.isL()) {
-            iActivityManager = BRActivityManagerNative.get().gDefault();
+        // 1) Try the normal singleton injection
+        try {
+            Object iActivityManager = null;
+            if (BuildCompat.isOreo()) {
+                iActivityManager = BRActivityManagerOreo.get().IActivityManagerSingleton();
+            } else if (BuildCompat.isL()) {
+                iActivityManager = BRActivityManagerNative.get().gDefault();
+            }
+            if (iActivityManager != null) {
+                BRSingleton.get(iActivityManager)._set_mInstance(proxy);
+                Slog.d(TAG, "inject: singleton instance replaced");
+                return;
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "inject: singleton path failed: " + t.getMessage());
         }
-        BRSingleton.get(iActivityManager)._set_mInstance(proxy);
+
+        Slog.w(TAG, "inject: could not replace IActivityManager singleton; hook is passive only");
     }
 
     @Override
     public boolean isBadEnv() {
-        return getProxyInvocation() != getWho();
+        try {
+            return getProxyInvocation() != getWho();
+        } catch (Throwable t) {
+            return true;
+        }
     }
 
     @Override
@@ -113,21 +155,19 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         try {
             return super.invoke(proxy, method, args);
         } catch (SecurityException e) {
-            // Handle SecurityExceptions gracefully for all ActivityManager calls
             String methodName = method.getName();
             Slog.w(TAG, "ActivityManager invoke: SecurityException in " + methodName + ", returning safe default", e);
-            
-            // Return appropriate default values based on method
+
             if (methodName.startsWith("set") || methodName.startsWith("update")) {
-                return null; // For setter methods, return null (success)
+                return null;
             } else if (methodName.startsWith("get") || methodName.startsWith("query")) {
-                return null; // For getter methods, return null (empty result)
+                return null;
             } else if (methodName.startsWith("start") || methodName.startsWith("bind")) {
-                return false; // For start/bind methods, return false (not started)
+                return false;
             } else if (methodName.startsWith("stop") || methodName.startsWith("unbind")) {
-                return true; // For stop/unbind methods, return true (stopped)
+                return true;
             } else {
-                return null; // Default fallback
+                return null;
             }
         } catch (Exception e) {
             Slog.e(TAG, "ActivityManager invoke: Unexpected error in " + method.getName(), e);
@@ -140,16 +180,12 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             try {
-                // Try to use the original method first
                 Object result = method.invoke(who, args);
                 if (result != null) {
                     return result;
                 }
-                
-                // If original method fails, return null to prevent crashes
                 Slog.w(TAG, "getContentProvider failed, returning null to prevent crash");
                 return null;
-                
             } catch (Exception e) {
                 Slog.w(TAG, "Error in getContentProvider, returning null: " + e.getMessage());
                 return null;
@@ -191,20 +227,18 @@ public class IActivityManagerProxy extends ClassInvocationStub {
             try {
                 Intent intent = (Intent) args[1];
                 String resolvedType = (String) args[2];
-                
-                                        // Check if the service belongs to the current app
-                        if (intent != null && intent.getComponent() != null) {
-                            String servicePackage = intent.getComponent().getPackageName();
-                            String currentPackage = BActivityThread.getAppPackageName();
 
-                            // If trying to stop a service from a different package, return false instead of crashing
-                            if (!servicePackage.equals(currentPackage)) {
-                                Slog.w(TAG, "StopService: Attempting to stop service from different package: " +
-                                        servicePackage + " (current: " + currentPackage + "), returning false");
-                                return false;
-                            }
-                        }
-                
+                if (intent != null && intent.getComponent() != null) {
+                    String servicePackage = intent.getComponent().getPackageName();
+                    String currentPackage = BActivityThread.getAppPackageName();
+
+                    if (!servicePackage.equals(currentPackage)) {
+                        Slog.w(TAG, "StopService: Attempting to stop service from different package: " +
+                                servicePackage + " (current: " + currentPackage + "), returning false");
+                        return false;
+                    }
+                }
+
                 return BlackBoxCore.getBActivityManager().stopService(intent, resolvedType, BActivityThread.getUserId());
             } catch (SecurityException e) {
                 Slog.w(TAG, "StopService: SecurityException caught, returning false", e);
@@ -223,20 +257,18 @@ public class IActivityManagerProxy extends ClassInvocationStub {
             try {
                 ComponentName componentName = (ComponentName) args[0];
                 IBinder token = (IBinder) args[1];
-                
-                                        // Check if the service belongs to the current app
-                        if (componentName != null) {
-                            String servicePackage = componentName.getPackageName();
-                            String currentPackage = BActivityThread.getAppPackageName();
 
-                            // If trying to stop a service from a different package, return true instead of crashing
-                            if (!servicePackage.equals(currentPackage)) {
-                                Slog.w(TAG, "StopServiceToken: Attempting to stop service from different package: " +
-                                        servicePackage + " (current: " + currentPackage + "), returning true");
-                                return true;
-                            }
-                        }
-                
+                if (componentName != null) {
+                    String servicePackage = componentName.getPackageName();
+                    String currentPackage = BActivityThread.getAppPackageName();
+
+                    if (!servicePackage.equals(currentPackage)) {
+                        Slog.w(TAG, "StopServiceToken: Attempting to stop service from different package: " +
+                                servicePackage + " (current: " + currentPackage + "), returning true");
+                        return true;
+                    }
+                }
+
                 BlackBoxCore.getBActivityManager().stopServiceToken(componentName, token, BActivityThread.getUserId());
                 return true;
             } catch (SecurityException e) {
@@ -254,44 +286,38 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             try {
-                                        // Check if the target package matches the current app
-                        if (args != null && args.length >= 2) {
-                            String targetPackage = (String) args[1];
-                            String currentPackage = BActivityThread.getAppPackageName();
+                if (args != null && args.length >= 2) {
+                    String targetPackage = (String) args[1];
+                    String currentPackage = BActivityThread.getAppPackageName();
 
-                            // If trying to set locus context for a different package, return success instead of crashing
-                            if (targetPackage != null && !targetPackage.equals(currentPackage)) {
-                                Slog.w(TAG, "SetActivityLocusContext: Attempting to set locus context for different package: " +
-                                        targetPackage + " (current: " + currentPackage + "), returning success");
-                                return null; // Return null for success
-                            }
-                        }
-                
-                // Proceed with original call if package matches
+                    if (targetPackage != null && !targetPackage.equals(currentPackage)) {
+                        Slog.w(TAG, "SetActivityLocusContext: Attempting to set locus context for different package: " +
+                                targetPackage + " (current: " + currentPackage + "), returning success");
+                        return null;
+                    }
+                }
+
                 return method.invoke(who, args);
             } catch (SecurityException e) {
                 Slog.w(TAG, "SetActivityLocusContext: SecurityException caught, returning success", e);
-                return null; // Return null for success
+                return null;
             } catch (Exception e) {
                 Slog.e(TAG, "SetActivityLocusContext: Error setting locus context", e);
-                return null; // Return null for success
+                return null;
             }
         }
     }
 
-    public static Object BindServiceCommon(Object who, Method method, Object[] args,int callingPackageIndex) throws Throwable {
+    public static Object BindServiceCommon(Object who, Method method, Object[] args, int callingPackageIndex) throws Throwable {
         try {
             Intent intent = (Intent) args[2];
             String resolvedType = (String) args[3];
             IServiceConnection connection = (IServiceConnection) args[4];
 
-            // Check for null intent
             if (intent == null) {
                 Slog.w(TAG, "BindServiceCommon: Intent is null, proceeding with original call");
                 return method.invoke(who, args);
             }
-
-            //int flags = MethodParameterUtils.toInt(args[5]);
 
             int userId = intent.getIntExtra("_B_|_UserId", -1);
             userId = userId == -1 ? BActivityThread.getUserId() : userId;
@@ -314,9 +340,8 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                     }
                 }
 
-                //Log.d(TAG,"Intent:" + intent + "-->" + "proxyIntent:" + proxyIntent + ",flag:" + intent.getFlags() + "proxyFlag:" + proxyIntent.getFlags());
-                if (proxyIntent != null && proxyIntent.getComponent() != null && 
-                    proxyIntent.getComponent().getPackageName().equals(BlackBoxCore.getHostPkg())){
+                if (proxyIntent != null && proxyIntent.getComponent() != null &&
+                        proxyIntent.getComponent().getPackageName().equals(BlackBoxCore.getHostPkg())) {
                     int flagsIndex = getFlagsIndex(args);
                     if (flagsIndex >= 0) {
                         int flags = MethodParameterUtils.toInt(args[flagsIndex]);
@@ -339,7 +364,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     }
 
     private static int getFlagsIndex(Object[] args) {
-        // Heuristic: flags is the first Number after IServiceConnection position (index 4)
         for (int i = 5; i < args.length; i++) {
             Object arg = args[i];
             if (arg instanceof Integer || arg instanceof Long) {
@@ -348,12 +372,12 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
         return -1;
     }
+
     @ProxyMethod("bindService")
     public static class BindService extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return BindServiceCommon(who,method,args,6);
+            return BindServiceCommon(who, method, args, 6);
         }
 
         @Override
@@ -362,12 +386,11 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
-    // android 14 add
     @ProxyMethod("bindServiceInstance")
     public static class bindServiceInstance extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return BindServiceCommon(who,method,args,7);
+            return BindServiceCommon(who, method, args, 7);
         }
 
         @Override
@@ -376,14 +399,12 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
-    // 10.0
     @ProxyMethod("bindIsolatedService")
     public static class BindIsolatedService extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            // instanceName
             args[6] = null;
-            return BindServiceCommon(who,method,args,7);
+            return BindServiceCommon(who, method, args, 7);
         }
 
         @Override
@@ -394,7 +415,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("unbindService")
     public static class UnbindService extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             IServiceConnection iServiceConnection = (IServiceConnection) args[0];
@@ -412,7 +432,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("getRunningAppProcesses")
     public static class GetRunningAppProcesses extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             RunningAppProcessInfo runningAppProcesses = BActivityManager.get().getRunningAppProcesses(BActivityThread.getAppPackageName(), BActivityThread.getUserId());
@@ -425,7 +444,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("getServices")
     public static class GetServices extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             RunningServiceInfo runningServices = BActivityManager.get().getRunningServices(BActivityThread.getAppPackageName(), BActivityThread.getUserId());
@@ -523,7 +541,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                 ProxyBroadcastRecord.saveStub(proxyIntent, intent, BActivityThread.getUserId());
                 args[intentIndex] = proxyIntent;
             }
-            // ignore permission
             for (int i = 0; i < args.length; i++) {
                 Object o = args[i];
                 if (o instanceof String[]) {
@@ -546,7 +563,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("unregisterReceiver")
     public static class unregisterReceiver extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return method.invoke(who, args);
@@ -555,7 +571,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("finishReceiver")
     public static class finishReceiver extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return method.invoke(who, args);
@@ -564,7 +579,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("publishService")
     public static class PublishService extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return method.invoke(who, args);
@@ -573,7 +587,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("peekService")
     public static class PeekService extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             MethodParameterUtils.replaceLastAppPkg(args);
@@ -584,19 +597,16 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
-    // todo
     @ProxyMethod("sendIntentSender")
     public static class SendIntentSender extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return 0;
         }
     }
 
-    // android 11 add
     @ProxyMethod("registerReceiverWithFeature")
-    public static class RegisterReceiverWithFeature extends MethodHook{
+    public static class RegisterReceiverWithFeature extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             MethodParameterUtils.replaceFirstAppPkg(args);
@@ -612,15 +622,14 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
                 args[receiverIndex] = proxy;
             }
-            // ignore permission
             if (args[getPermissionIndex()] != null) {
                 args[getPermissionIndex()] = null;
             }
 
             if (BuildCompat.isU()) {
                 int flagsIndex = args.length - 1;
-                int flags = (int)args[flagsIndex];
-                if((flags & RECEIVER_NOT_EXPORTED) == 0 && (flags & RECEIVER_EXPORTED) == 0){
+                int flags = (int) args[flagsIndex];
+                if ((flags & RECEIVER_NOT_EXPORTED) == 0 && (flags & RECEIVER_EXPORTED) == 0) {
                     flags |= RECEIVER_NOT_EXPORTED;
                 }
                 args[flagsIndex] = flags;
@@ -644,10 +653,8 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
-    //maxTargetSdk=29
     @ProxyMethod("registerReceiver")
     public static class RegisterReceiver extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             MethodParameterUtils.replaceFirstAppPkg(args);
@@ -664,7 +671,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                 args[receiverIndex] = proxy;
             }
             int permissionIndex = 4;
-            // ignore permission
             if (args[permissionIndex] != null) {
                 args[permissionIndex] = null;
             }
@@ -685,11 +691,9 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     public static class setServiceForeground extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            // Allow foreground service promotion to proceed, and neutralize service type enforcement on Android 14+
-            // Find an int argument that represents foregroundServiceType and zero it out
             for (int i = args.length - 1; i >= 0; i--) {
                 if (args[i] instanceof Integer) {
-                    args[i] = 0; // remove service type requirements (e.g., MICROPHONE)
+                    args[i] = 0;
                     break;
                 }
             }
@@ -724,24 +728,21 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                     || permission.equals(Manifest.permission.SEND_SMS)) {
                 return PackageManager.PERMISSION_GRANTED;
             }
-            
-            // Handle all audio-related permissions comprehensively
+
             if (isAudioPermission(permission)) {
                 Slog.d(TAG, "ActivityManager checkPermission: Granting audio permission: " + permission);
                 return PackageManager.PERMISSION_GRANTED;
             }
 
-            // Handle storage/media read permissions so apps can query MediaStore
             if (isStorageOrMediaPermission(permission)) {
                 Slog.d(TAG, "ActivityManager checkPermission: Granting storage/media permission: " + permission);
                 return PackageManager.PERMISSION_GRANTED;
             }
-            
+
             return method.invoke(who, args);
         }
     }
 
-    // Keep in sync with IPackageManagerProxy helper
     private static boolean isAudioPermission(String permission) {
         if (permission == null) return false;
         return permission.equals(Manifest.permission.RECORD_AUDIO)
@@ -767,7 +768,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         }
     }
 
-    // Keep in sync with IPackageManagerProxy helper
     private static boolean isStorageOrMediaPermission(String permission) {
         if (permission == null) return false;
         if (permission.equals(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -787,12 +787,11 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                 || permission.equals("android.permission.READ_MEDIA_IMAGES_USER_SELECTED")
                 || permission.equals("android.permission.READ_MEDIA_VISUAL_USER_SELECTED")
                 || permission.equals("android.permission.READ_MEDIA_AURAL_USER_SELECTED")) {
-                return true;
+            return true;
         }
         return false;
     }
 
-    // for < Android 10
     @ProxyMethod("setTaskDescription")
     public static class SetTaskDescription extends MethodHook {
         @Override
@@ -805,7 +804,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("setRequestedOrientation")
     public static class setRequestedOrientation extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             try {
@@ -819,7 +817,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("registerUidObserver")
     public static class registerUidObserver extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return 0;
@@ -828,7 +825,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("unregisterUidObserver")
     public static class unregisterUidObserver extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return 0;
@@ -837,7 +833,6 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
     @ProxyMethod("updateConfiguration")
     public static class updateConfiguration extends MethodHook {
-
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return 0;
