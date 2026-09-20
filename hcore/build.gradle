@@ -1,6 +1,7 @@
 apply plugin: 'com.android.library'
 
 android {
+    compileSdkVersion = 35
     namespace 'top.niunaijun.blackbox'
 
     compileSdk rootProject.ext.compileSdkVersion
@@ -15,14 +16,14 @@ android {
         prefab true
     }
     defaultConfig {
-        minSdkVersion rootProject.ext.minSdk
-        versionCode rootProject.ext.versionCode
-        versionName rootProject.ext.versionName
+        minSdkVersion 29
+        targetSdkVersion 35
+        versionCode 1
+        versionName "1.0"
 
         consumerProguardFiles "consumer-rules.pro"
         ndk {
-            // 设置支持的SO库架构
-            abiFilters 'arm64-v8a' , 'armeabi-v7a'
+            abiFilters "arm64-v8a"
         }
     }
 
