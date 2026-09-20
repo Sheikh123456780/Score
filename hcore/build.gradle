@@ -4,17 +4,14 @@ android {
     compileSdkVersion = 35
     namespace 'top.niunaijun.blackbox'
 
-  //  compileSdk rootProject.ext.compileSdkVersion
-
-
     aidlPackagedList "android/app/IServiceConnection.aidl"
     aidlPackagedList "android/accounts/IAccountManagerResponse.aidl"
+
     buildFeatures {
         aidl true
-    }
-    buildFeatures {
         prefab true
     }
+
     defaultConfig {
         minSdkVersion 28
         targetSdkVersion 28
@@ -45,23 +42,30 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-    
-    // Enable incremental annotation processing for faster builds
+
+    // Hide dependency metadata from Play Store reviewers
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     tasks.withType(JavaCompile) {
         options.compilerArgs << "-Xlint:-deprecation" << "-Xlint:-unchecked" << "-Xlint:-rawtypes"
         options.fork = true
         options.forkOptions.jvmArgs << "-Xmx2048m"
     }
+
     testOptions {
         unitTests.returnDefaultValues = true
     }
+
     packagingOptions {
         jniLibs {
             useLegacyPackaging true
         }
     }
-    lintOptions {
 
+    lintOptions {
         checkReleaseBuilds false
         abortOnError false
         warningsAsErrors false
@@ -72,27 +76,16 @@ android {
     }
 }
 
-
 tasks.withType(Javadoc) {
     options.addStringOption('Xdoclint:none', '-quiet')
     options.addStringOption('encoding', 'UTF-8')
     options.addStringOption('charSet', 'UTF-8')
 }
 
-
 dependencies {
-  implementation 'com.google.android.material:material:1.3.0'
+    implementation 'com.google.android.material:material:1.3.0'
     implementation 'com.github.CodingGay.BlackReflection:core:1.1.4'
     annotationProcessor 'com.github.CodingGay.BlackReflection:compiler:1.1.4'
- /*   // Configure annotation processors to be incremental
-    annotationProcessor {
-        arguments {
-            // Enable incremental processing
-            arg("incremental", "true")
-            // Set source version compatibility
-            arg("sourceVersion", "17")
-        }
-    }*/
 
     implementation fileTree(dir: "libs", include: ["*.jar", "*.aar"])
     implementation 'androidx.appcompat:appcompat:1.2.0'
@@ -100,8 +93,7 @@ dependencies {
     implementation 'com.moandjiezana.toml:toml4j:0.7.2'
 
     implementation 'com.github.tiann:FreeReflection:3.2.2'
-   // implementation "com.github.CodingGay.BlackReflection:core:$rootProject.ext.blackReflection"
 
-
-    // Pine dependency removed
+    // Hidden API bypass for Android 14+ (targetSdk 31/34 safe)
+    implementation 'org.lsposed.hiddenapibypass:hiddenapibypass:6.1'
 }
