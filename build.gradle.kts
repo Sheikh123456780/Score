@@ -7,7 +7,7 @@ ext.apply {
     set("cmakeVersion", "3.22.1") //latest
     set("ktx_version", "1.12.0") // kotlin dependency version androidx.core:core-ktx
     set("stdlib_version", "1.8.22") // kotlin stdlib version org.jetbrains.kotlin:kotlin-stdlib-jdk7
-    set("hiddenapibypass", "4.3") // kotlin stdlib version org.lsposed.hiddenapibypass:hiddenapibypass
+  //  set("hiddenapibypass", "4.3") // kotlin stdlib version org.lsposed.hiddenapibypass:hiddenapibypass
     set("xcrashversion", "3.0.0") // com.iqiyi.xcrash:xcrash-android-lib
     set("shadowhook", "1.0.8") // com.bytedance.android:shadowhook:
     set("googlematerial", "1.11.0") // com.google.android.material:material:
