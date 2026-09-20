@@ -3,23 +3,18 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
-        jcenter()
         maven { url = uri("https://jitpack.io") }
-        flatDir {
-        dirs("libs")
-    }
     }
 }
+
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
-        jcenter()
     }
 }
-
 
 rootProject.name = "NewBlackbox-3.0"
 include(":hcore")
