@@ -10,15 +10,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import top.niunaijun.blackbox.utils.MethodParameterUtils;
+import top.niunaijun.blackbox.utils.Slog;
 
-/**
- * updated by alex5402 on 3/30/21.
- * * ∧＿∧
- * (`･ω･∥
- * 丶　つ０
- * しーＪ
- * TFNQw5HgWUS33Ke1eNmSFTwoQySGU7XNsK (USDT TRC20)
- */
+
 public abstract class ClassInvocationStub implements InvocationHandler, IInjectHook {
     public static final String TAG = ClassInvocationStub.class.getSimpleName();
 
@@ -26,6 +20,7 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
     private Object mBase;
     private Object mProxyInvocation;
     private boolean onlyProxy;
+    private boolean mHookInjected = false;
 
     protected abstract Object getWho();
 
@@ -49,25 +44,96 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
 
     @Override
     public void injectHook() {
-        mBase = getWho();
-        mProxyInvocation = Proxy.newProxyInstance(mBase.getClass().getClassLoader(), MethodParameterUtils.getAllInterface(mBase.getClass()), this);
-        if (!onlyProxy) {
-            inject(mBase, mProxyInvocation);
+        if (mHookInjected) {
+            Slog.d(TAG, getClass().getSimpleName() + ": hook already injected, skipping");
+            return;
         }
 
-        onBindMethod();
-        Class<?>[] declaredClasses = this.getClass().getDeclaredClasses();
-        for (Class<?> declaredClass : declaredClasses) {
-            initAnnotation(declaredClass);
+        // ---- Safe getWho() ----
+        try {
+            mBase = getWho();
+        } catch (Throwable t) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": getWho() threw, skipping hook: " + t.getMessage());
+            return;
         }
-        ScanClass scanClass = this.getClass().getAnnotation(ScanClass.class);
-        if (scanClass != null) {
-            for (Class<?> aClass : scanClass.value()) {
-                for (Class<?> declaredClass : aClass.getDeclaredClasses()) {
+
+        if (mBase == null) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": getWho() returned null (hidden-api deny or service missing), skipping hook");
+            return;
+        }
+
+        ClassLoader cl = mBase.getClass().getClassLoader();
+        Class<?>[] interfaces;
+        try {
+            interfaces = MethodParameterUtils.getAllInterface(mBase.getClass());
+        } catch (Throwable t) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": getAllInterface failed: " + t.getMessage());
+            return;
+        }
+
+        if (interfaces == null || interfaces.length == 0) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": no interfaces to proxy, skipping hook");
+            return;
+        }
+
+        try {
+            mProxyInvocation = Proxy.newProxyInstance(cl, interfaces, this);
+        } catch (Throwable t) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": Proxy.newProxyInstance failed: " + t.getMessage());
+            return;
+        }
+
+        try {
+            if (!onlyProxy) {
+                inject(mBase, mProxyInvocation);
+            }
+            onBindMethod();
+            mHookInjected = true;
+        } catch (Throwable t) {
+            Slog.w(TAG, getClass().getSimpleName()
+                    + ": inject/onBindMethod failed: " + t.getMessage());
+            return;
+        }
+
+        // ---- Annotation scanning (each class wrapped individually) ----
+        try {
+            Class<?>[] declaredClasses = this.getClass().getDeclaredClasses();
+            for (Class<?> declaredClass : declaredClasses) {
+                try {
                     initAnnotation(declaredClass);
+                } catch (Throwable t) {
+                    Slog.w(TAG, "initAnnotation failed for "
+                            + declaredClass.getName() + ": " + t.getMessage());
                 }
             }
+        } catch (Throwable t) {
+            Slog.w(TAG, "declaredClasses iteration failed: " + t.getMessage());
         }
+
+        try {
+            ScanClass scanClass = this.getClass().getAnnotation(ScanClass.class);
+            if (scanClass != null) {
+                for (Class<?> aClass : scanClass.value()) {
+                    for (Class<?> declaredClass : aClass.getDeclaredClasses()) {
+                        try {
+                            initAnnotation(declaredClass);
+                        } catch (Throwable t) {
+                            Slog.w(TAG, "initAnnotation failed for "
+                                    + declaredClass.getName() + ": " + t.getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "ScanClass processing failed: " + t.getMessage());
+        }
+
+        Slog.d(TAG, getClass().getSimpleName() + ": hook injected successfully");
     }
 
     protected void initAnnotation(Class<?> clazz) {
@@ -78,7 +144,8 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
                 try {
                     addMethodHook(name, (MethodHook) clazz.newInstance());
                 } catch (Throwable t) {
-                    t.printStackTrace();
+                    Slog.w(TAG, "initAnnotation ProxyMethod failed for "
+                            + clazz.getName() + ": " + t.getMessage());
                 }
             }
         }
@@ -89,7 +156,8 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
                 try {
                     addMethodHook(name, (MethodHook) clazz.newInstance());
                 } catch (Throwable t) {
-                    t.printStackTrace();
+                    Slog.w(TAG, "initAnnotation ProxyMethods failed for "
+                            + clazz.getName() + ": " + t.getMessage());
                 }
             }
         }
@@ -105,32 +173,62 @@ public abstract class ClassInvocationStub implements InvocationHandler, IInjectH
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-//        for debug
-//        if(method.getName().contains("finish")){
-//            Log.d(TAG,"finishAAAAAAAAAAAAAAA:" + method.getName());
-//            Thread currentThread = Thread.currentThread();
-//            StackTraceElement[] stackTraceElements = currentThread.getStackTrace();
-//            for (StackTraceElement element : stackTraceElements) {
-//                // 打印调用栈信息
-//                Log.d(TAG,element.toString());
-//            }
-//        }
+        // ---- Safe method lookup ----
+        MethodHook methodHook = null;
+        try {
+            methodHook = mMethodHookMap.get(method.getName());
+        } catch (Throwable t) {
+            Slog.w(TAG, "methodHook lookup failed: " + t.getMessage());
+        }
 
-        MethodHook methodHook = mMethodHookMap.get(method.getName());
         if (methodHook == null || !methodHook.isEnable()) {
+            // pass-through
             try {
                 return method.invoke(mBase, args);
             } catch (Throwable e) {
-                throw e.getCause();
+                Throwable cause = e.getCause();
+                throw cause != null ? cause : e;
             }
         }
 
-        Object result = methodHook.beforeHook(mBase, method, args);
-        if (result != null) {
-            return result;
+        // ---- Hook path ----
+        Object result;
+        try {
+            result = methodHook.beforeHook(mBase, method, args);
+            if (result != null) {
+                return result;
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "beforeHook failed for " + method.getName()
+                    + ": " + t.getMessage());
+            try {
+                return method.invoke(mBase, args);
+            } catch (Throwable e) {
+                Throwable cause = e.getCause();
+                throw cause != null ? cause : e;
+            }
         }
-        result = methodHook.hook(mBase, method, args);
-        result = methodHook.afterHook(result);
+
+        try {
+            result = methodHook.hook(mBase, method, args);
+        } catch (Throwable t) {
+            Slog.w(TAG, "hook failed for " + method.getName()
+                    + ": " + t.getMessage());
+            try {
+                return method.invoke(mBase, args);
+            } catch (Throwable e) {
+                Throwable cause = e.getCause();
+                throw cause != null ? cause : e;
+            }
+        }
+
+        try {
+            result = methodHook.afterHook(result);
+        } catch (Throwable t) {
+            Slog.w(TAG, "afterHook failed for " + method.getName()
+                    + ": " + t.getMessage());
+        }
+
         return result;
     }
 }
