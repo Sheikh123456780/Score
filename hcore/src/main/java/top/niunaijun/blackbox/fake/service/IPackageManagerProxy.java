@@ -11,6 +11,7 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.IInterface;
 import android.util.Log;
 
 import java.lang.reflect.Method;
@@ -48,17 +49,14 @@ public class IPackageManagerProxy extends BinderInvocationStub {
 
     /**
      * Resolve the IPackageManager binder safely.
-     * Priority:
-     *   1. ActivityThread.sPackageManager()
-     *   2. ServiceManager.getService("package")
-     *   3. Dummy Binder (prevents super() NPE)
+     * Returns IBinder (required by BinderInvocationStub constructor).
      */
-    private static Object resolvePackageManagerBinder() {
+    private static IBinder resolvePackageManagerBinder() {
         // 1) Try ActivityThread.sPackageManager()
         try {
             Object pm = BRActivityThread.get().sPackageManager();
-            if (pm != null) {
-                IBinder b = pm.asBinder();
+            if (pm instanceof IInterface) {
+                IBinder b = ((IInterface) pm).asBinder();
                 if (b != null) {
                     Slog.d(TAG, "resolvePackageManagerBinder: got sPackageManager binder");
                     return b;
@@ -74,9 +72,9 @@ public class IPackageManagerProxy extends BinderInvocationStub {
             Method getService = sm.getDeclaredMethod("getService", String.class);
             getService.setAccessible(true);
             Object b = getService.invoke(null, "package");
-            if (b != null) {
+            if (b instanceof IBinder) {
                 Slog.d(TAG, "resolvePackageManagerBinder: got binder from ServiceManager");
-                return b;
+                return (IBinder) b;
             }
         } catch (Throwable t) {
             Slog.w(TAG, "resolvePackageManagerBinder: ServiceManager failed: " + t.getMessage());
@@ -102,16 +100,14 @@ public class IPackageManagerProxy extends BinderInvocationStub {
 
         // Fall back to asInterface on ServiceManager binder
         try {
-            Object binder = resolvePackageManagerBinder();
-            if (binder instanceof IBinder) {
-                Class<?> stub = Class.forName("android.content.pm.IPackageManager$Stub");
-                Method asInterface = stub.getDeclaredMethod("asInterface", IBinder.class);
-                asInterface.setAccessible(true);
-                Object pm = asInterface.invoke(null, binder);
-                if (pm != null) {
-                    Slog.d(TAG, "getWho: returning asInterface(ServiceManager binder)");
-                    return pm;
-                }
+            IBinder binder = resolvePackageManagerBinder();
+            Class<?> stub = Class.forName("android.content.pm.IPackageManager$Stub");
+            Method asInterface = stub.getDeclaredMethod("asInterface", IBinder.class);
+            asInterface.setAccessible(true);
+            Object pm = asInterface.invoke(null, binder);
+            if (pm != null) {
+                Slog.d(TAG, "getWho: returning asInterface(ServiceManager binder)");
+                return pm;
             }
         } catch (Throwable t) {
             Slog.w(TAG, "getWho: asInterface path failed: " + t.getMessage());
@@ -260,7 +256,7 @@ public class IPackageManagerProxy extends BinderInvocationStub {
             appInfo.packageName = "com.android.vending";
             appInfo.name = "Google Play Store";
             appInfo.flags = ApplicationInfo.FLAG_SYSTEM;
-            appInfo.uid = 10001; // System app UID
+            appInfo.uid = 10001;
             packageInfo.applicationInfo = appInfo;
 
             Slog.d(TAG, "GetPackageInfo: Providing fake Google Play Services info");
