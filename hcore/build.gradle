@@ -43,12 +43,6 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    // Hide dependency metadata from Play Store reviewers
-    dependenciesInfo {
-        includeInApk = false
-        includeInBundle = false
-    }
-
     tasks.withType(JavaCompile) {
         options.compilerArgs << "-Xlint:-deprecation" << "-Xlint:-unchecked" << "-Xlint:-rawtypes"
         options.fork = true
