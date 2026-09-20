@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 
 
 rootProject.name = "NewBlackbox-3.0"
-include(":Bcore")
+include(":hcore")
